@@ -1,17 +1,28 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { homeFor } from '../lib/roles';
 
-export const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+export const PrivateRoute = ({ children, roles }) => {
+  const { user, isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-foam border-t-brass-500" />
       </div>
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  // Si el rol no tiene acceso a esta pantalla, lo mandamos a su inicio
+  if (roles && !roles.includes(user?.role)) return <Navigate to={homeFor(user?.role)} replace />;
+
+  return children;
+};
+
+export const RoleHome = () => {
+  const { user, isAuthenticated } = useAuth();
+  return <Navigate to={isAuthenticated ? homeFor(user?.role) : '/login'} replace />;
 };

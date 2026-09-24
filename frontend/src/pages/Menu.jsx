@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useData } from '../hooks/useData';
-import { Navbar } from '../components/Navbar';
-import { Card } from '../components/Card';
-import { Leaf, Flame } from 'lucide-react';
+import { Layout, PageHeader, Loader, EmptyState } from '../components/Layout';
+import { Badge } from '../components/StatusBadge';
+import { BookOpen, Clock } from 'lucide-react';
 import api from '../services/api';
 
 export const Menu = () => {
-  const [categories, setCategories] = useState([]);
   const [menuByCategory, setMenuByCategory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,93 +25,86 @@ export const Menu = () => {
     loadMenu();
   }, []);
 
-  if (loading) {
-    return (
-      <div>
-        <Navbar />
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <Navbar />
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Menú</h1>
+    <Layout>
+      {loading ? (
+        <Loader />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow="Carta de la casa"
+            title="Menú"
+            subtitle="Lo que servimos hoy, organizado por categoría."
+          />
 
-        {menuByCategory.length === 0 ? (
-          <Card className="text-center py-8">
-            <p className="text-gray-600">No hay menú disponible</p>
-          </Card>
-        ) : (
-          menuByCategory.map((categoryGroup) => (
-            <div key={categoryGroup.category.id} className="mb-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span>{categoryGroup.category.icon}</span>
-                {categoryGroup.category.name}
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categoryGroup.items.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="hover:shadow-lg transition-shadow overflow-hidden"
-                  >
-                    {item.image && (
-                      <div className="w-full h-32 bg-gray-200 mb-3 rounded overflow-hidden">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+          {menuByCategory.length === 0 ? (
+            <EmptyState icon={BookOpen} title="No hay menú disponible" description="Agrega productos desde el panel de administración." />
+          ) : (
+            <div className="space-y-14">
+              {menuByCategory.map((categoryGroup) => (
+                <section key={categoryGroup.category.id} className="animate-fade-in">
+                  <div className="mb-6 flex items-center gap-4">
+                    {categoryGroup.category.icon && (
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-foam text-xl">
+                        {categoryGroup.category.icon}
+                      </span>
                     )}
+                    <h2 className="text-3xl font-medium text-espresso-800">{categoryGroup.category.name}</h2>
+                    <span className="h-px flex-1 bg-espresso-100" />
+                    <span className="text-xs uppercase tracking-wider text-espresso-300">
+                      {categoryGroup.items.length} productos
+                    </span>
+                  </div>
 
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                      <span className="text-xl font-bold text-primary-600">${item.price}</span>
-                    </div>
+                  <div className="grid grid-cols-1 gap-x-10 gap-y-2 md:grid-cols-2">
+                    {categoryGroup.items.map((item) => (
+                      <article
+                        key={item.id}
+                        className="group flex gap-4 rounded-2xl p-3 transition-colors hover:bg-paper"
+                      >
+                        {item.image && (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {/* Nombre ····· precio, estilo carta */}
+                          <div className="flex items-baseline gap-2">
+                            <h3 className="font-serif text-lg font-medium text-espresso-800">{item.name}</h3>
+                            <span className="mb-1 flex-1 border-b border-dotted border-espresso-200" />
+                            <span className="font-serif text-lg font-medium text-brass-600">${item.price}</span>
+                          </div>
 
-                    {item.description && (
-                      <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                    )}
+                          {item.description && (
+                            <p className="mt-1 line-clamp-2 text-sm text-espresso-400">{item.description}</p>
+                          )}
 
-                    {/* Dietary Info */}
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {item.is_vegetarian && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
-                          <Leaf className="w-3 h-3" />
-                          Vegetariano
-                        </span>
-                      )}
-                      {item.is_vegan && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
-                          <Leaf className="w-3 h-3" />
-                          Vegano
-                        </span>
-                      )}
-                      {item.has_gluten && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-medium">
-                          <Flame className="w-3 h-3" />
-                          Gluten
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Preparation Time */}
-                    <div className="text-xs text-gray-500">
-                      ⏱️ {item.preparation_time} min
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {item.is_vegan ? (
+                              <Badge tone="sage">Vegano</Badge>
+                            ) : item.is_vegetarian ? (
+                              <Badge tone="sage">Vegetariano</Badge>
+                            ) : null}
+                            {item.has_gluten && <Badge tone="honey">Gluten</Badge>}
+                            {item.preparation_time && (
+                              <span className="inline-flex items-center gap-1 text-xs text-espresso-300">
+                                <Clock className="h-3.5 w-3.5" />
+                                {item.preparation_time} min
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
-          ))
-        )}
-      </div>
-    </div>
+          )}
+        </>
+      )}
+    </Layout>
   );
 };

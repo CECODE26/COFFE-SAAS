@@ -1,5 +1,5 @@
 import React, { createContext, useState, useCallback } from 'react';
-import api from '../services/api';
+import api, { fetchAll } from '../services/api';
 
 export const DataContext = createContext();
 
@@ -15,8 +15,8 @@ export const DataProvider = ({ children }) => {
   const fetchMesas = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/mesas/mesas/');
-      setMesas(response.data.results || response.data);
+      const data = await fetchAll('/mesas/mesas/');
+      setMesas(data);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -49,8 +49,8 @@ export const DataProvider = ({ children }) => {
   const fetchPedidos = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/pedidos/orders/');
-      setPedidos(response.data.results || response.data);
+      const data = await fetchAll('/pedidos/orders/');
+      setPedidos(data);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -98,8 +98,8 @@ export const DataProvider = ({ children }) => {
   const fetchReservas = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/mesas/reservas/');
-      setReservas(response.data.results || response.data);
+      const data = await fetchAll('/mesas/reservas/');
+      setReservas(data);
       setError(null);
     } catch (err) {
       setError(err.message);

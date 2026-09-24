@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../hooks/useData';
-import { Navbar } from '../components/Navbar';
+import { Layout, PageHeader, Loader, EmptyState, Segmented } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { ChefHat, DollarSign, Clock } from 'lucide-react';
+import { StatusBadge, Badge } from '../components/StatusBadge';
+import { ChefHat, DollarSign, Receipt, Check, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const ACTIVE = ['pendiente', 'confirmada', 'preparando', 'lista'];
 
 export const Pedidos = () => {
   const { pedidos, fetchPedidos, updatePedidoStatus } = useData();
@@ -35,189 +38,132 @@ export const Pedidos = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      pendiente: 'bg-yellow-100 text-yellow-800',
-      confirmada: 'bg-blue-100 text-blue-800',
-      preparando: 'bg-orange-100 text-orange-800',
-      lista: 'bg-green-100 text-green-800',
-      entregada: 'bg-gray-100 text-gray-800',
-      cancelada: 'bg-red-100 text-red-800',
-    };
-    return badges[status] || badges.pendiente;
-  };
-
   const filteredPedidos = filter === 'all'
     ? pedidos
     : filter === 'pending'
-    ? pedidos.filter(p => ['pendiente', 'confirmada', 'preparando', 'lista'].includes(p.status))
+    ? pedidos.filter(p => ACTIVE.includes(p.status))
     : pedidos.filter(p => p.status === filter);
 
-  if (loading) {
-    return (
-      <div>
-        <Navbar />
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <Navbar />
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Pedidos</h1>
-          <div className="flex gap-2">
-            {[
-              { value: 'all', label: 'Todos' },
-              { value: 'pending', label: 'Activos' },
-              { value: 'entregada', label: 'Completados' },
-            ].map((f) => (
-              <Button
-                key={f.value}
-                variant={filter === f.value ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setFilter(f.value)}
-              >
-                {f.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+    <Layout>
+      {loading ? (
+        <Loader />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow="Barra y cocina"
+            title="Pedidos"
+            subtitle="Sigue cada orden desde que se toma hasta que se cobra."
+            actions={
+              <Segmented
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'Todos', count: pedidos.length },
+                  { value: 'pending', label: 'Activos', count: pedidos.filter(p => ACTIVE.includes(p.status)).length },
+                  { value: 'entregada', label: 'Completados', count: pedidos.filter(p => p.status === 'entregada').length },
+                ]}
+              />
+            }
+          />
 
-        {/* Pedidos List */}
-        <div className="space-y-4">
           {filteredPedidos.length === 0 ? (
-            <Card className="text-center py-8">
-              <p className="text-gray-600">No hay pedidos para mostrar</p>
-            </Card>
+            <EmptyState icon={Receipt} title="No hay pedidos para mostrar" description="Cuando lleguen nuevas órdenes aparecerán aquí." />
           ) : (
-            filteredPedidos.map((pedido) => (
-              <Card key={pedido.id} className="hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {pedido.order_number}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {new Date(pedido.created_at).toLocaleString('es-EC')}
-                    </p>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {filteredPedidos.map((pedido, i) => (
+                <Card
+                  key={pedido.id}
+                  padded={false}
+                  className="animate-fade-in flex flex-col hover:shadow-lift"
+                  style={{ animationDelay: `${i * 40}ms` }}
+                >
+                  <div className="flex items-start justify-between gap-4 p-6 pb-4">
+                    <div>
+                      {pedido.cafeteria_name && <p className="eyebrow mb-1">{pedido.cafeteria_name}</p>}
+                      <h3 className="text-2xl font-medium text-espresso-800">{pedido.order_number}</h3>
+                      <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-espresso-400">
+                        <Clock className="h-3.5 w-3.5" />
+                        {new Date(pedido.created_at).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' })}
+                        <span className="text-espresso-200">·</span>
+                        <span className="capitalize">{pedido.order_type}</span>
+                      </p>
+                    </div>
+                    <StatusBadge status={pedido.status} />
                   </div>
-                  <div className="text-right">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(pedido.status)}`}>
-                      {pedido.status}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 py-4 border-y border-gray-200">
-                  <div>
-                    <p className="text-sm text-gray-600">Tipo</p>
-                    <p className="font-semibold text-gray-900">{pedido.order_type}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Items</p>
-                    <p className="font-semibold text-gray-900">{pedido.items?.length || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total</p>
-                    <p className="font-semibold text-lg text-gray-900">${pedido.total}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Pago</p>
-                    <p className="font-semibold text-gray-900">
-                      {pedido.is_paid ? '✓ Pagado' : 'Pendiente'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Items */}
-                {pedido.items && pedido.items.length > 0 && (
-                  <div className="mb-4 bg-gray-50 rounded p-3">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Items:</p>
-                    <div className="space-y-1">
-                      {pedido.items.map((item, idx) => (
-                        <p key={idx} className="text-sm text-gray-600">
-                          • {item.menu_item_name} x{item.quantity}
-                        </p>
-                      ))}
+                  {/* Items estilo ticket */}
+                  <div className="mx-6 flex-1 rounded-xl border border-dashed border-espresso-100 bg-cream/50 px-4 py-3">
+                    {pedido.items && pedido.items.length > 0 ? (
+                      <ul className="space-y-1.5 text-sm">
+                        {pedido.items.map((item, idx) => (
+                          <li key={idx} className="flex justify-between gap-4 text-espresso-600">
+                            <span className="truncate">{item.menu_item_name}</span>
+                            <span className="shrink-0 text-espresso-400">×{item.quantity}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-espresso-500">
+                        {pedido.items_count || 0} {pedido.items_count === 1 ? 'producto' : 'productos'}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center justify-between border-t border-dashed border-espresso-100 pt-3">
+                      {pedido.is_paid ? (
+                        <Badge tone="sage">Pagado</Badge>
+                      ) : (
+                        <Badge tone="honey">Por cobrar</Badge>
+                      )}
+                      <span className="font-serif text-2xl font-medium text-espresso-800">${pedido.total}</span>
                     </div>
                   </div>
-                )}
 
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2">
-                  {pedido.status === 'pendiente' && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleStatusChange(pedido.id, 'confirm')}
-                      >
-                        Confirmar
+                  {/* Acciones */}
+                  <div className="flex flex-wrap gap-2 p-6 pt-4">
+                    {pedido.status === 'pendiente' && (
+                      <>
+                        <Button size="sm" onClick={() => handleStatusChange(pedido.id, 'confirm')}>
+                          <Check className="h-4 w-4" />
+                          Confirmar
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => handleStatusChange(pedido.id, 'cancel')}>
+                          Cancelar
+                        </Button>
+                      </>
+                    )}
+
+                    {pedido.status === 'confirmada' && (
+                      <Button size="sm" variant="accent" onClick={() => handleStatusChange(pedido.id, 'send_to_kitchen')}>
+                        <ChefHat className="h-4 w-4" />
+                        Enviar a cocina
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => handleStatusChange(pedido.id, 'cancel')}
-                      >
-                        Cancelar
+                    )}
+
+                    {pedido.status === 'preparando' && (
+                      <Button size="sm" variant="success" onClick={() => handleStatusChange(pedido.id, 'mark_ready')}>
+                        Marcar listo
                       </Button>
-                    </>
-                  )}
+                    )}
 
-                  {pedido.status === 'confirmada' && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleStatusChange(pedido.id, 'send_to_kitchen')}
-                      className="flex items-center gap-2"
-                    >
-                      <ChefHat className="w-4 h-4" />
-                      Enviar a Cocina
-                    </Button>
-                  )}
+                    {pedido.status === 'lista' && (
+                      <Button size="sm" variant="success" onClick={() => handleStatusChange(pedido.id, 'complete')}>
+                        Entregado
+                      </Button>
+                    )}
 
-                  {pedido.status === 'preparando' && (
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => handleStatusChange(pedido.id, 'mark_ready')}
-                    >
-                      Marcar Listo
-                    </Button>
-                  )}
-
-                  {pedido.status === 'lista' && (
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => handleStatusChange(pedido.id, 'complete')}
-                    >
-                      Entregado
-                    </Button>
-                  )}
-
-                  {!pedido.is_paid && pedido.status === 'entregada' && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleStatusChange(pedido.id, 'mark_paid')}
-                      className="flex items-center gap-2"
-                    >
-                      <DollarSign className="w-4 h-4" />
-                      Pagado
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
+                    {!pedido.is_paid && pedido.status === 'entregada' && (
+                      <Button size="sm" onClick={() => handleStatusChange(pedido.id, 'mark_paid')}>
+                        <DollarSign className="h-4 w-4" />
+                        Registrar pago
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </Layout>
   );
 };

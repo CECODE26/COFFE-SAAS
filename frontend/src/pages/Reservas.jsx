@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../hooks/useData';
-import { Navbar } from '../components/Navbar';
+import { Layout, PageHeader, Loader, EmptyState, Segmented } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { Phone, Calendar } from 'lucide-react';
+import { StatusBadge } from '../components/StatusBadge';
+import { Phone, Mail, CalendarDays, Users, Armchair, Check, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const Reservas = () => {
@@ -35,132 +36,112 @@ export const Reservas = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      pendiente: 'bg-yellow-100 text-yellow-800',
-      confirmada: 'bg-green-100 text-green-800',
-      cancelada: 'bg-red-100 text-red-800',
-      completada: 'bg-gray-100 text-gray-800',
-    };
-    return badges[status] || badges.pendiente;
-  };
-
   const filteredReservas = filter === 'all'
     ? reservas
     : reservas.filter(r => r.status === filter);
 
-  if (loading) {
-    return (
-      <div>
-        <Navbar />
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <Navbar />
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Reservas</h1>
-          <div className="flex gap-2">
-            {[
-              { value: 'all', label: 'Todas' },
-              { value: 'pendiente', label: 'Pendientes' },
-              { value: 'confirmada', label: 'Confirmadas' },
-            ].map((f) => (
-              <Button
-                key={f.value}
-                variant={filter === f.value ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setFilter(f.value)}
-              >
-                {f.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+    <Layout>
+      {loading ? (
+        <Loader />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow="Agenda"
+            title="Reservas"
+            subtitle="Quién viene, cuándo y a qué mesa."
+            actions={
+              <Segmented
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'Todas', count: reservas.length },
+                  { value: 'pendiente', label: 'Pendientes', count: reservas.filter(r => r.status === 'pendiente').length },
+                  { value: 'confirmada', label: 'Confirmadas', count: reservas.filter(r => r.status === 'confirmada').length },
+                ]}
+              />
+            }
+          />
 
-        {/* Reservas List */}
-        <div className="space-y-4">
           {filteredReservas.length === 0 ? (
-            <Card className="text-center py-8">
-              <p className="text-gray-600">No hay reservas para mostrar</p>
-            </Card>
+            <EmptyState icon={CalendarDays} title="No hay reservas para mostrar" description="Las nuevas reservas aparecerán aquí." />
           ) : (
-            filteredReservas.map((reserva) => (
-              <Card key={reserva.id} className="hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {reserva.customer_name}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-                      <Phone className="w-4 h-4" />
-                      {reserva.customer_phone}
+            <div className="space-y-4">
+              {filteredReservas.map((reserva, i) => {
+                const raw = reserva.reservation_date || '';
+                const date = new Date(raw.length === 10 ? `${raw}T00:00:00` : raw);
+                return (
+                  <Card
+                    key={reserva.id}
+                    padded={false}
+                    className="animate-fade-in flex flex-col overflow-hidden hover:shadow-lift sm:flex-row"
+                    style={{ animationDelay: `${i * 40}ms` }}
+                  >
+                    {/* Bloque de fecha */}
+                    <div className="flex shrink-0 items-center gap-4 bg-espresso-800 px-6 py-4 text-cream sm:w-36 sm:flex-col sm:justify-center sm:gap-0 sm:py-6">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brass-300">
+                        {date.toLocaleDateString('es-EC', { month: 'short' }).replace('.', '')}
+                      </p>
+                      <p className="font-serif text-4xl font-medium leading-none sm:my-1 sm:text-5xl">{date.getDate()}</p>
+                      <p className="text-sm text-espresso-200">{reserva.reservation_time?.slice(0, 5)}</p>
                     </div>
-                    {reserva.customer_email && (
-                      <p className="text-sm text-gray-600">{reserva.customer_email}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(reserva.status)}`}>
-                      {reserva.status}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-gray-200 mb-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Mesa</p>
-                    <p className="font-semibold text-gray-900">#{reserva.mesa_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Clientes</p>
-                    <p className="font-semibold text-gray-900">{reserva.guest_count}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Fecha</p>
-                    <p className="font-semibold text-gray-900">
-                      {new Date(reserva.reservation_date).toLocaleDateString('es-EC')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Hora</p>
-                    <p className="font-semibold text-gray-900">{reserva.reservation_time}</p>
-                  </div>
-                </div>
+                    <div className="flex flex-1 flex-col gap-4 p-6 md:flex-row md:items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-2xl font-medium text-espresso-800">{reserva.customer_name}</h3>
+                          <StatusBadge status={reserva.status} />
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-espresso-400">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5" />
+                            {reserva.customer_phone}
+                          </span>
+                          {reserva.customer_email && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5" />
+                              {reserva.customer_email}
+                            </span>
+                          )}
+                        </div>
+                        {reserva.notes && (
+                          <p className="mt-3 inline-flex items-start gap-2 rounded-lg bg-brass-50 px-3 py-2 text-sm text-espresso-600">
+                            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-brass-500" />
+                            {reserva.notes}
+                          </p>
+                        )}
+                      </div>
 
-                {reserva.notes && (
-                  <div className="mb-4 bg-blue-50 rounded p-3">
-                    <p className="text-sm text-blue-900">
-                      <strong>Notas:</strong> {reserva.notes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2">
-                  {reserva.status === 'pendiente' && (
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => handleConfirm(reserva.id)}
-                      className="flex items-center gap-2"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      Confirmar
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
+                      <div className="flex items-center gap-6 md:border-l md:border-foam md:pl-6">
+                        <div>
+                          <p className="stat-label">Mesa</p>
+                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl text-espresso-800">
+                            <Armchair className="h-4 w-4 text-brass-500" />
+                            {reserva.mesa_number}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="stat-label">Personas</p>
+                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl text-espresso-800">
+                            <Users className="h-4 w-4 text-brass-500" />
+                            {reserva.guest_count}
+                          </p>
+                        </div>
+                        {reserva.status === 'pendiente' && (
+                          <Button size="sm" onClick={() => handleConfirm(reserva.id)}>
+                            <Check className="h-4 w-4" />
+                            Confirmar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </Layout>
   );
 };

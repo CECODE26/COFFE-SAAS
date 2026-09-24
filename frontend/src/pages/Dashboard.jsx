@@ -1,13 +1,24 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useData } from '../hooks/useData';
-import { Navbar } from '../components/Navbar';
+import { useAuth } from '../hooks/useAuth';
+import { Layout, PageHeader, Loader } from '../components/Layout';
 import { Card } from '../components/Card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, ShoppingCart, Utensils, Calendar } from 'lucide-react';
+import { StatusBadge } from '../components/StatusBadge';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Users, Receipt, Armchair, Gauge, ArrowUpRight } from 'lucide-react';
 import api from '../services/api';
 
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+};
+
 export const Dashboard = () => {
-  const { mesas, pedidos, fetchMesas, fetchPedidos } = useData();
+  const { pedidos, fetchMesas, fetchPedidos } = useData();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,109 +43,151 @@ export const Dashboard = () => {
   }, [fetchMesas, fetchPedidos]);
 
   const chartData = [
-    { name: 'Disponibles', value: stats?.available_mesas || 0 },
-    { name: 'Ocupadas', value: stats?.occupied_mesas || 0 },
-    { name: 'Reservadas', value: stats?.reserved_mesas || 0 },
+    { name: 'Disponibles', value: stats?.available_mesas || 0, color: '#5b7a55' },
+    { name: 'Ocupadas', value: stats?.occupied_mesas || 0, color: '#b0523a' },
+    { name: 'Reservadas', value: stats?.reserved_mesas || 0, color: '#cf9442' },
   ];
 
   const statCards = [
     {
-      icon: Utensils,
+      icon: Armchair,
       label: 'Mesas',
       value: stats?.total_mesas || 0,
-      color: 'bg-blue-500',
+      hint: `${stats?.available_mesas || 0} disponibles`,
     },
     {
-      icon: ShoppingCart,
-      label: 'Pedidos Activos',
-      value: pedidos.filter(p => p.status !== 'entregada').length,
-      color: 'bg-orange-500',
+      icon: Receipt,
+      label: 'En curso',
+      value: pedidos.filter(p => !['entregada', 'cancelada'].includes(p.status)).length,
+      hint: `pedidos de ${pedidos.length}`,
+    },
+    {
+      icon: Gauge,
+      label: 'Ocupación',
+      value: `${Math.round(stats?.average_occupancy || 0)}%`,
+      hint: 'promedio del salón',
     },
     {
       icon: Users,
-      label: 'Ocupación',
-      value: `${Math.round(stats?.average_occupancy || 0)}%`,
-      color: 'bg-green-500',
-    },
-    {
-      icon: Calendar,
-      label: 'Capacidad Total',
+      label: 'Capacidad',
       value: stats?.total_capacity || 0,
-      color: 'bg-purple-500',
+      hint: 'comensales',
     },
   ];
 
-  if (loading) {
-    return (
-      <div>
-        <Navbar />
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    );
-  }
+  const today = new Date().toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div>
-      <Navbar />
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+    <Layout>
+      {loading ? (
+        <Loader />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow={today}
+            title={`${greeting()}${user?.first_name ? `, ${user.first_name}` : ''}`}
+            subtitle="Así va tu cafetería hoy."
+          />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {statCards.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.label} className="relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+          {/* Métricas */}
+          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {statCards.map((stat, i) => {
+              const Icon = stat.icon;
+              const featured = i === 0;
+              return (
+                <div
+                  key={stat.label}
+                  className={`animate-fade-in rounded-xl2 p-5 ${
+                    featured
+                      ? 'bg-espresso-800 text-cream shadow-lift'
+                      : 'border border-espresso-100/70 bg-paper shadow-soft'
+                  }`}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs font-medium uppercase tracking-wider ${featured ? 'text-espresso-200' : 'text-espresso-400'}`}>
+                      {stat.label}
+                    </p>
+                    <Icon className={`h-4 w-4 ${featured ? 'text-brass-300' : 'text-brass-500'}`} />
                   </div>
-                  <div className={`${stat.color} p-3 rounded-lg`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
+                  <p className={`mt-4 font-serif text-4xl font-medium ${featured ? 'text-cream' : 'text-espresso-800'}`}>
+                    {stat.value}
+                  </p>
+                  <p className={`mt-1 text-xs ${featured ? 'text-espresso-300' : 'text-espresso-400'}`}>{stat.hint}</p>
                 </div>
-              </Card>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Mesa Status Chart */}
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Estado de Mesas</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" fill="#8b5cf6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* Recent Orders */}
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Pedidos Recientes</h2>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {pedidos.slice(0, 5).map((pedido) => (
-                <div key={pedido.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium text-gray-900">{pedido.order_number}</p>
-                    <p className="text-sm text-gray-600">{pedido.status}</p>
-                  </div>
-                  <span className="font-semibold text-gray-900">${pedido.total}</span>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            {/* Estado de mesas */}
+            <Card className="lg:col-span-3">
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-medium text-espresso-800">Estado del salón</h2>
+                  <p className="text-sm text-espresso-400">Distribución actual de mesas</p>
                 </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </div>
-    </div>
+                <Link to="/mesas" className="inline-flex items-center gap-1 text-sm font-medium text-brass-600 hover:text-brass-700">
+                  Ver mesas <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartData} barSize={56}>
+                  <CartesianGrid vertical={false} stroke="#efe6d8" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#8c6b55', fontSize: 12 }} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#b39680', fontSize: 12 }} width={28} />
+                  <Tooltip
+                    cursor={{ fill: '#f7f1e8' }}
+                    contentStyle={{
+                      background: '#2b1e16',
+                      border: 'none',
+                      borderRadius: 12,
+                      color: '#f7f1e8',
+                      fontSize: 13,
+                    }}
+                    itemStyle={{ color: '#f7f1e8' }}
+                    labelStyle={{ color: '#dcae64' }}
+                    formatter={(v) => [v, 'Mesas']}
+                  />
+                  <Bar dataKey="value" radius={[10, 10, 4, 4]}>
+                    {chartData.map((d) => (
+                      <Cell key={d.name} fill={d.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+
+            {/* Pedidos recientes */}
+            <Card className="lg:col-span-2">
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-medium text-espresso-800">Pedidos recientes</h2>
+                  <p className="text-sm text-espresso-400">Últimos movimientos</p>
+                </div>
+                <Link to="/pedidos" className="inline-flex items-center gap-1 text-sm font-medium text-brass-600 hover:text-brass-700">
+                  Todos <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </div>
+              {pedidos.length === 0 ? (
+                <p className="py-12 text-center font-serif italic text-espresso-400">Aún no hay pedidos hoy.</p>
+              ) : (
+                <ul className="divide-y divide-foam">
+                  {pedidos.slice(0, 5).map((pedido) => (
+                    <li key={pedido.id} className="flex items-center justify-between gap-3 py-3.5">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-espresso-800">{pedido.order_number}</p>
+                        <StatusBadge status={pedido.status} className="mt-1" />
+                      </div>
+                      <span className="font-serif text-lg text-espresso-700">${pedido.total}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
+    </Layout>
   );
 };

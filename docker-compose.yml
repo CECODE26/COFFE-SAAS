@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5436:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     image: redis:7-alpine
     container_name: coffe_saas_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -102,7 +102,7 @@ services:
       dockerfile: Dockerfile
     container_name: coffe_saas_frontend
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       REACT_APP_API_URL: "http://localhost:8000/api/v1"
       REACT_APP_ENV: "production"

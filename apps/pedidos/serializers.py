@@ -42,12 +42,14 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
+    cafeteria_name = serializers.CharField(source='cafeteria.name', read_only=True)
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'status', 'order_type', 'total',
-            'is_paid', 'customer_info', 'items_count', 'created_at'
+            'is_paid', 'customer_info', 'items_count', 'created_at',
+            'tenant', 'cafeteria', 'cafeteria_name'
         ]
         read_only_fields = ['id', 'order_number', 'created_at']
 

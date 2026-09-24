@@ -1,17 +1,20 @@
 from rest_framework import serializers
 from .models import Cafeteria
+from apps.tenants.models import Tenant
 
 
 class CafeteriaListSerializer(serializers.ModelSerializer):
     active_users_count = serializers.SerializerMethodField()
     mesas_count = serializers.SerializerMethodField()
+    tenant_name = serializers.CharField(source='tenant.name', read_only=True)
 
     class Meta:
         model = Cafeteria
         fields = [
-            'id', 'name', 'slug', 'city', 'phone', 'email',
+            'id', 'name', 'slug', 'city', 'address', 'phone', 'email',
             'capacity', 'open_time', 'close_time', 'is_active',
-            'active_users_count', 'mesas_count', 'created_at'
+            'active_users_count', 'mesas_count', 'created_at',
+            'tenant', 'tenant_name'
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -46,24 +49,18 @@ class CafeteriaDetailSerializer(serializers.ModelSerializer):
 
 
 class CafeteriaCreateSerializer(serializers.ModelSerializer):
+    # Solo el super admin lo envía; el distribuidor usa su propio tenant
+    tenant = serializers.PrimaryKeyRelatedField(queryset=Tenant.objects.all(), required=False)
+
     class Meta:
         model = Cafeteria
         fields = [
-            'name', 'description', 'address', 'city',
+            'id', 'tenant', 'name', 'description', 'address', 'city',
             'postal_code', 'phone', 'email', 'ruc',
             'max_tables', 'capacity', 'open_time', 'close_time',
             'logo', 'banner'
         ]
-
-    def validate_name(self, value):
-        request = self.context.get('request')
-        tenant = request.tenant if hasattr(request, 'tenant') else None
-
-        if tenant and Cafeteria.objects.filter(
-            tenant=tenant, name=value
-        ).exists():
-            raise serializers.ValidationError("Ya existe una cafetería con este nombre.")
-        return value
+        read_only_fields = ['id']
 
     def validate_max_tables(self, value):
         if value < 1:
@@ -75,16 +72,28 @@ class CafeteriaCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La capacidad debe ser mayor a 0.")
         return value
 
-    def create(self, validated_data):
+    def validate(self, attrs):
         from django.utils.text import slugify
 
-        request = self.context.get('request')
-        tenant = request.tenant if hasattr(request, 'tenant') else None
+        user = self.context['request'].user
+        if user.role == 'super_admin':
+            tenant = attrs.get('tenant')
+            if not tenant:
+                raise serializers.ValidationError({'tenant': 'Selecciona un distribuidor.'})
+        else:
+            tenant = user.tenant
+        attrs['tenant'] = tenant
 
-        validated_data['slug'] = slugify(validated_data['name'])
-        validated_data['tenant'] = tenant
+        if not tenant.can_create_cafe():
+            raise serializers.ValidationError(
+                {'non_field_errors': f'{tenant.name} alcanzó el límite de {tenant.max_cafes} cafeterías de su plan.'}
+            )
 
-        return super().create(validated_data)
+        slug = slugify(attrs['name'])
+        if Cafeteria.objects.filter(tenant=tenant, slug=slug).exists():
+            raise serializers.ValidationError({'name': 'Ya existe una cafetería con este nombre.'})
+        attrs['slug'] = slug
+        return attrs
 
 
 class CafeteriaUpdateSerializer(serializers.ModelSerializer):

@@ -31,44 +31,75 @@ class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES, default='usuario')
+    # Solo el super admin lo envía; el distribuidor usa su propio tenant
+    tenant = serializers.PrimaryKeyRelatedField(queryset=Tenant.objects.all(), required=False, allow_null=True)
+
+    # Roles que puede asignar cada tipo de administrador
+    ASSIGNABLE_ROLES = {
+        'super_admin': [r for r, _ in User.ROLE_CHOICES],
+        'distribuidor_admin': ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero', 'usuario'],
+    }
+    # Roles que trabajan dentro de un local
+    CAFE_ROLES = ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero']
 
     class Meta:
         model = User
         fields = [
-            'email', 'first_name', 'last_name', 'phone',
-            'password', 'password2', 'role', 'cafeteria',
+            'id', 'email', 'first_name', 'last_name', 'phone',
+            'password', 'password2', 'role', 'tenant', 'cafeteria',
             'language', 'timezone'
         ]
+        read_only_fields = ['id']
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Este email ya está registrado.")
-        return value
+        return value.lower()
 
     def validate(self, attrs):
         if attrs['password'] != attrs.pop('password2'):
             raise serializers.ValidationError(
-                {'password': 'Las contraseñas no coinciden.'}
+                {'password2': 'Las contraseñas no coinciden.'}
+            )
+
+        creator = self.context['request'].user
+        role = attrs.get('role', 'usuario')
+
+        if role not in self.ASSIGNABLE_ROLES.get(creator.role, []):
+            raise serializers.ValidationError({'role': 'No puedes asignar este rol.'})
+
+        if creator.role == 'super_admin':
+            tenant = attrs.get('tenant')
+            if role != 'super_admin' and not tenant:
+                raise serializers.ValidationError({'tenant': 'Selecciona un distribuidor.'})
+            if role == 'super_admin':
+                tenant = None
+        else:
+            tenant = creator.tenant
+        attrs['tenant'] = tenant
+
+        cafeteria = attrs.get('cafeteria')
+        if role in self.CAFE_ROLES and not cafeteria:
+            raise serializers.ValidationError({'cafeteria': 'Este rol necesita una cafetería.'})
+        if role not in self.CAFE_ROLES:
+            attrs['cafeteria'] = cafeteria = None
+        if cafeteria and cafeteria.tenant_id != getattr(tenant, 'id', None):
+            raise serializers.ValidationError({'cafeteria': 'La cafetería no pertenece a este distribuidor.'})
+
+        if tenant and not tenant.can_create_user():
+            raise serializers.ValidationError(
+                {'non_field_errors': f'{tenant.name} alcanzó el límite de {tenant.max_users} usuarios de su plan.'}
             )
         return attrs
 
     def create(self, validated_data):
-        request = self.context.get('request')
-        tenant = request.tenant if hasattr(request, 'tenant') else None
-
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            password=validated_data['password'],
-            phone=validated_data.get('phone', ''),
-            role=validated_data.get('role', 'usuario'),
-            cafeteria=validated_data.get('cafeteria'),
-            tenant=tenant,
-            language=validated_data.get('language', 'es'),
-            timezone=validated_data.get('timezone', 'America/Guayaquil'),
+        password = validated_data.pop('password')
+        return User.objects.create_user(
+            password=password,
+            is_staff=validated_data.get('role') == 'super_admin',
+            is_superuser=validated_data.get('role') == 'super_admin',
+            **validated_data,
         )
-        return user
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -91,8 +122,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not user.is_active:
             raise serializers.ValidationError('Esta cuenta está desactivada.')
 
-        attrs['user'] = user
-        return super().validate({'user': user})
+        refresh = self.get_token(user)
+        return {'refresh': str(refresh), 'access': str(refresh.access_token)}
 
     @classmethod
     def get_token(cls, user):

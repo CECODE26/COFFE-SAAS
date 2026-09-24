@@ -65,7 +65,7 @@ class Mesa(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='mesa',
+        related_name='mesa_actual',
         help_text="Pedido activo en la mesa"
     )
 

@@ -55,4 +55,17 @@ api.interceptors.response.use(
   }
 );
 
+// Recorre todas las páginas de un endpoint paginado y devuelve la lista completa
+export const fetchAll = async (url) => {
+  const results = [];
+  let next = url;
+  while (next) {
+    const { data } = await api.get(next);
+    if (Array.isArray(data)) return data;
+    results.push(...data.results);
+    next = data.next;
+  }
+  return results;
+};
+
 export default api;

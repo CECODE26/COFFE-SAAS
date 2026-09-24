@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/v1/mesas/', include('apps.mesas.urls')),
     path('api/v1/menu/', include('apps.menu.urls')),
     path('api/v1/facturacion/', include('apps.facturacion.urls')),
+    path('api/v1/privacidad/', include('apps.auditoria.urls')),
 ]
 
 if settings.DEBUG:

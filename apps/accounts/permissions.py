@@ -21,10 +21,12 @@ class IsTenantMember(permissions.BasePermission):
         return (
             request.user and
             request.user.is_authenticated and
-            request.user.tenant_id is not None
+            (request.user.role == 'super_admin' or request.user.tenant_id is not None)
         )
 
     def has_object_permission(self, request, view, obj):
+        if request.user.role == 'super_admin':
+            return True
         if hasattr(obj, 'tenant_id'):
             return request.user.tenant_id == obj.tenant_id
         return True

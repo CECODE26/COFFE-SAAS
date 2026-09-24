@@ -1,13 +1,16 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:16-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
+# Install npm 8 for better compatibility
+RUN npm install -g npm@8
+
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy app source
 COPY . .

@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
-class ${app^}Config(AppConfig):
+class CafeteriasConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.${app}'
+    name = 'apps.cafeterias'

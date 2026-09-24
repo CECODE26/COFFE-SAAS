@@ -7,12 +7,14 @@ from django.utils import timezone
 class MesaListSerializer(serializers.ModelSerializer):
     occupied_time = serializers.SerializerMethodField()
     current_order_number = serializers.CharField(source='current_order.order_number', read_only=True)
+    cafeteria_name = serializers.CharField(source='cafeteria.name', read_only=True)
 
     class Meta:
         model = Mesa
         fields = [
-            'id', 'number', 'slug', 'capacity', 'status', 'guest_count',
-            'location', 'occupied_time', 'current_order_number', 'is_active'
+            'id', 'number', 'slug', 'capacity', 'min_capacity', 'status', 'guest_count',
+            'location', 'occupied_time', 'current_order_number', 'is_active',
+            'cafeteria', 'cafeteria_name'
         ]
         read_only_fields = ['id']
 

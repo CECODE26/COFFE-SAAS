@@ -54,20 +54,6 @@ class CafeteriaViewSet(viewsets.ModelViewSet):
 
         return Cafeteria.objects.none()
 
-    def perform_create(self, serializer):
-        """Crear cafetería - verificar límite de plan"""
-        tenant = self.request.user.tenant
-
-        if not tenant.can_create_cafe():
-            return Response(
-                {
-                    'error': f'Has alcanzado el límite de cafeterías ({tenant.max_cafes}) para tu plan'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer.save()
-
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):
         """Obtener estadísticas de la cafetería"""
