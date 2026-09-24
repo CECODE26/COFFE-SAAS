@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
-    container_name: coffe_saas_db
+    container_name: coffe_saas_db_dev
     environment:
       POSTGRES_DB: coffe_saas
       POSTGRES_USER: postgres
@@ -22,7 +22,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: coffe_saas_redis
+    container_name: coffe_saas_redis_dev
     ports:
       - "6379:6379"
     healthcheck:
@@ -31,19 +31,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # Django App
+  # Django App (Development)
   web:
     build: .
-    container_name: coffe_saas_web
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    container_name: coffe_saas_web_dev
+    command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     environment:
-      DEBUG: "False"
-      SECRET_KEY: "django-insecure-change-in-production"
+      DEBUG: "True"
+      SECRET_KEY: "django-insecure-dev-key"
       DB_ENGINE: "django.db.backends.postgresql"
       DB_NAME: "coffe_saas"
       DB_USER: "postgres"
@@ -51,42 +48,43 @@ services:
       DB_HOST: "db"
       DB_PORT: "5432"
       REDIS_URL: "redis://redis:6379/0"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
     volumes:
       - .:/app
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
+      - /app/.git
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  # Celery Worker (para background tasks)
-  celery:
-    build: .
-    container_name: coffe_saas_celery
-    command: celery -A config worker -l info
+  # React Frontend (Development - Hot Reload)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: coffe_saas_frontend_dev
+    ports:
+      - "3000:3000"
     environment:
-      DEBUG: "False"
-      SECRET_KEY: "django-insecure-change-in-production"
-      DB_ENGINE: "django.db.backends.postgresql"
-      DB_NAME: "coffe_saas"
-      DB_USER: "postgres"
-      DB_PASSWORD: "postgres"
-      DB_HOST: "db"
-      DB_PORT: "5432"
-      REDIS_URL: "redis://redis:6379/0"
+      REACT_APP_API_URL: "http://localhost:8000/api/v1"
+      REACT_APP_ENV: "development"
+      WDS_SOCKET_HOST: localhost
+      WDS_SOCKET_PORT: 3000
+      WDS_SOCKET_PATH: /ws
     volumes:
-      - .:/app
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - /app/node_modules
     depends_on:
-      - db
-      - redis
       - web
+    networks:
+      - coffe_saas_network
 
   # pgAdmin para gestionar BD
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: coffe_saas_pgadmin
+    container_name: coffe_saas_pgadmin_dev
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@coffe.local
       PGADMIN_DEFAULT_PASSWORD: admin
@@ -95,26 +93,8 @@ services:
     depends_on:
       - db
 
-  # React Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: coffe_saas_frontend
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: "http://localhost:8000/api/v1"
-      REACT_APP_ENV: "production"
-    depends_on:
-      - web
-    networks:
-      - coffe_saas_network
-
 volumes:
   postgres_data:
-  static_volume:
-  media_volume:
 
 networks:
   coffe_saas_network:
