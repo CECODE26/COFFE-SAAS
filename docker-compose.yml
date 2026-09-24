@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: coffe_saas_db
+    environment:
+      POSTGRES_DB: coffe_saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: coffe_saas_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django App
+  web:
+    build: .
+    container_name: coffe_saas_web
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "django-insecure-change-in-production"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "coffe_saas"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      REDIS_URL: "redis://redis:6379/0"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Worker (para background tasks)
+  celery:
+    build: .
+    container_name: coffe_saas_celery
+    command: celery -A config worker -l info
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "django-insecure-change-in-production"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "coffe_saas"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      REDIS_URL: "redis://redis:6379/0"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+      - web
+
+  # pgAdmin para gestionar BD
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: coffe_saas_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@coffe.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+
+networks:
+  default:
+    name: coffe_saas_network
