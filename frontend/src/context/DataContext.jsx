@@ -1,0 +1,144 @@
+import React, { createContext, useState, useCallback } from 'react';
+import api from '../services/api';
+
+export const DataContext = createContext();
+
+export const DataProvider = ({ children }) => {
+  const [mesas, setMesas] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [reservas, setReservas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Mesas
+  const fetchMesas = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/mesas/mesas/');
+      setMesas(response.data.results || response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const occupyMesa = useCallback(async (mesaId, guestCount) => {
+    try {
+      await api.post(`/mesas/mesas/${mesaId}/occupy/`, { guest_count: guestCount });
+      await fetchMesas();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchMesas]);
+
+  const freeMesa = useCallback(async (mesaId) => {
+    try {
+      await api.post(`/mesas/mesas/${mesaId}/free/`);
+      await fetchMesas();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchMesas]);
+
+  // Pedidos
+  const fetchPedidos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/pedidos/orders/');
+      setPedidos(response.data.results || response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createPedido = useCallback(async (data) => {
+    try {
+      const response = await api.post('/pedidos/orders/', data);
+      await fetchPedidos();
+      return response.data;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchPedidos]);
+
+  const updatePedidoStatus = useCallback(async (pedidoId, action) => {
+    try {
+      await api.post(`/pedidos/orders/${pedidoId}/${action}/`);
+      await fetchPedidos();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchPedidos]);
+
+  // Menu Items
+  const fetchMenuItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/menu/items/available/');
+      setMenuItems(response.data.results || response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Reservas
+  const fetchReservas = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/mesas/reservas/');
+      setReservas(response.data.results || response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const confirmReserva = useCallback(async (reservaId) => {
+    try {
+      await api.post(`/mesas/reservas/${reservaId}/confirm/`);
+      await fetchReservas();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchReservas]);
+
+  const value = {
+    mesas,
+    pedidos,
+    menuItems,
+    reservas,
+    loading,
+    error,
+    fetchMesas,
+    occupyMesa,
+    freeMesa,
+    fetchPedidos,
+    createPedido,
+    updatePedidoStatus,
+    fetchMenuItems,
+    fetchReservas,
+    confirmReserva,
+  };
+
+  return (
+    <DataContext.Provider value={value}>
+      {children}
+    </DataContext.Provider>
+  );
+};
