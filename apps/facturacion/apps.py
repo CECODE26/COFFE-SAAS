@@ -1,5 +1,7 @@
 from django.apps import AppConfig
 
-class ${app^}Config(AppConfig):
+
+class FacturacionConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.${app}'
+    name = 'apps.facturacion'
+    verbose_name = 'Facturación'
