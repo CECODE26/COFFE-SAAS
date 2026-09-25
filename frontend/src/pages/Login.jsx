@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { CintaCarta, CintaFirma, LogoSello, SelloGiratorio, TazaPorcelana, Toldo, Vitrina } from '../components/Decor';
 import toast from 'react-hot-toast';
@@ -23,6 +23,15 @@ export const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Llegó aquí porque la sesión venció o se perdió: avisamos una sola vez y limpiamos la URL
+  useEffect(() => {
+    if (searchParams.get('sesion') === 'expirada') {
+      toast('Tu sesión expiró. Vuelve a iniciar sesión.', { id: 'sesion-expirada', icon: '⏳' });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

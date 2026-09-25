@@ -53,7 +53,7 @@ export const Plataforma = () => {
 
   useEffect(() => {
     load()
-      .catch(() => toast.error('Error cargando la plataforma'))
+      .catch(() => toast.error('Error cargando la plataforma', { id: 'Error cargando la plataforma' }))
       .finally(() => setLoading(false));
   }, [load]);
 

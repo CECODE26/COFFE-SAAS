@@ -146,17 +146,17 @@ export const Layout = ({ children }) => {
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-12">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</main>
     </div>
   );
 };
 
 export const PageHeader = ({ eyebrow, title, subtitle, actions }) => (
-  <div className="animate-fade-in mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+  <div className="animate-fade-in mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      {eyebrow && <p className="mb-1 font-script text-[26px] leading-none text-oro-600">{eyebrow}</p>}
-      <h1 className="font-serif text-4xl italic font-medium leading-[1.05] text-verde-700 sm:text-[3rem]">{title}</h1>
-      {subtitle && <p className="mt-3 max-w-xl text-verde-600">{subtitle}</p>}
+      {eyebrow && <p className="mb-0.5 font-script text-[20px] leading-none text-oro-600">{eyebrow}</p>}
+      <h1 className="font-serif text-[1.75rem] italic font-medium leading-[1.1] text-verde-700 sm:text-[2.1rem]">{title}</h1>
+      {subtitle && <p className="mt-1 max-w-xl text-sm text-verde-600">{subtitle}</p>}
     </div>
     {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
   </div>

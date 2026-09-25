@@ -43,7 +43,7 @@ export const Reservas = () => {
       try {
         await fetchReservas();
       } catch (error) {
-        toast.error('Error cargando reservas');
+        toast.error('Error cargando reservas', { id: 'Error cargando reservas' });
       } finally {
         setLoading(false);
       }

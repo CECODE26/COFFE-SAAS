@@ -60,7 +60,7 @@ export const Mesas = () => {
       try {
         await fetchMesas();
       } catch (error) {
-        toast.error('Error cargando mesas');
+        toast.error('Error cargando mesas', { id: 'Error cargando mesas' });
       } finally {
         setLoading(false);
       }
@@ -147,53 +147,51 @@ export const Mesas = () => {
   // Posición de cada mesa en la lista visible, para escalonar la animación con tope
   const position = new Map(filtered.map((m, i) => [m.id, i]));
 
+  // Tarjeta compacta: número y estado en una línea, detalles debajo y la acción dentro
   const renderMesa = (mesa) => {
     const action = mesaAction(mesa);
     return (
       <Card
         key={mesa.id}
         padded={false}
-        className="animate-fade-in group relative overflow-hidden hover:shadow-lift"
+        className="animate-fade-in group relative overflow-hidden !rounded-2xl hover:shadow-lift"
         style={{ animationDelay: `${Math.min(position.get(mesa.id) || 0, 10) * 40}ms` }}
       >
-        <span className={`absolute inset-x-0 top-0 h-1.5 ${ACCENT[statusTone(mesa.status)]}`} aria-hidden="true" />
-        <span className="absolute inset-x-0 top-1.5 h-px bg-oro-300/80" aria-hidden="true" />
-        <div className="p-6 pt-7">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="stat-label truncate">Mesa</p>
-              <p className="mt-2 font-serif text-[3.25rem] italic font-medium leading-none text-verde-700">{mesa.number}</p>
-            </div>
-            <StatusBadge status={mesa.status} className="shrink-0" />
+        <span className={`absolute inset-x-0 top-0 h-1 ${ACCENT[statusTone(mesa.status)]}`} aria-hidden="true" />
+        <div className="px-3.5 pb-3 pt-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex min-w-0 items-baseline gap-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Mesa</span>
+              <span className="font-serif text-[1.6rem] italic font-medium leading-none text-verde-700">{mesa.number}</span>
+            </p>
+            <StatusBadge status={mesa.status} className="shrink-0 !px-2 !py-0.5 !text-[9px] !tracking-[0.1em]" />
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-dashed border-oro-300/70 pt-4 text-sm text-verde-600">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-verde-600">
             {mesa.location && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 text-oro-600" aria-hidden="true" />
-                {mesa.location}
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
+                <span className="truncate">{mesa.location}</span>
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-oro-600" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1">
+              <Users className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
               {mesa.status === 'ocupada' ? `${mesa.guest_count} / ${mesa.capacity}` : `${mesa.capacity} pers.`}
             </span>
           </div>
-        </div>
 
-        {action && (
-          <div className="border-t border-oro-200/70 bg-crema/70 px-6 py-3">
+          {action && (
             <Button
               size="sm"
               variant={action.variant}
               disabled={busyId === mesa.id}
               onClick={action.onClick}
-              className="w-full"
+              className="mt-3 w-full !min-h-[32px] !px-2 !text-[10px] !tracking-[0.12em]"
             >
               {action.label}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
     );
   };
@@ -224,13 +222,13 @@ export const Mesas = () => {
           {filtered.length === 0 ? (
             <EmptyState icon={Armchair} title="Sin mesas aquí" description="Prueba con otro filtro." />
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-6">
               {groups.map((g) => (
                 <section key={g.key}>
                   {/* Encabezado del local (solo cuando hay varios): cursiva, filete y rombo dorado */}
                   {g.name && (
-                    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-                      <h2 className="min-w-0 font-serif text-2xl italic font-medium leading-tight text-verde-700">{g.name}</h2>
+                    <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <h2 className="min-w-0 font-serif text-lg italic font-medium leading-tight text-verde-700">{g.name}</h2>
                       <span className="flex min-w-[3rem] flex-1 items-center gap-2" aria-hidden="true">
                         <span className="h-px flex-1 bg-oro-300" />
                         <span className="rombo" />
@@ -241,7 +239,7 @@ export const Mesas = () => {
                       </span>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{g.mesas.map(renderMesa)}</div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{g.mesas.map(renderMesa)}</div>
                 </section>
               ))}
             </div>

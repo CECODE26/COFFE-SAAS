@@ -49,7 +49,7 @@ export const Pedidos = () => {
       try {
         await fetchPedidos();
       } catch (error) {
-        toast.error('Error cargando pedidos');
+        toast.error('Error cargando pedidos', { id: 'Error cargando pedidos' });
       } finally {
         setLoading(false);
       }

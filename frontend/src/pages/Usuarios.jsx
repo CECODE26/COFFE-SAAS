@@ -43,7 +43,7 @@ export const Usuarios = () => {
 
   useEffect(() => {
     load()
-      .catch(() => toast.error('Error cargando usuarios'))
+      .catch(() => toast.error('Error cargando usuarios', { id: 'Error cargando usuarios' }))
       .finally(() => setLoading(false));
   }, []);
 

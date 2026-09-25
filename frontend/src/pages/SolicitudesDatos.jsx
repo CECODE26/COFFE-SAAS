@@ -66,7 +66,7 @@ export const SolicitudesDatos = () => {
 
   useEffect(() => {
     load()
-      .catch(() => toast.error('Error cargando solicitudes'))
+      .catch(() => toast.error('Error cargando solicitudes', { id: 'Error cargando solicitudes' }))
       .finally(() => setLoading(false));
   }, []);
 

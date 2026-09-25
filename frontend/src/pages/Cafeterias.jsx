@@ -21,7 +21,7 @@ export const Cafeterias = () => {
 
   useEffect(() => {
     load()
-      .catch(() => toast.error('Error cargando cafeterías'))
+      .catch(() => toast.error('Error cargando cafeterías', { id: 'Error cargando cafeterías' }))
       .finally(() => setLoading(false));
   }, []);
 

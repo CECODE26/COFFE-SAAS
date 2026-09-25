@@ -46,7 +46,7 @@ export const Distribuidor = () => {
         setOrders(o);
         setUsers(u);
       })
-      .catch(() => toast.error('Error cargando tu red'))
+      .catch(() => toast.error('Error cargando tu red', { id: 'Error cargando tu red' }))
       .finally(() => setLoading(false));
   }, []);
 
@@ -109,42 +109,42 @@ export const Distribuidor = () => {
             }
           />
 
-          <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div
-              className="animate-fade-in rounded-xl2 bg-verde-700 p-5 text-marfil"
+              className="animate-fade-in rounded-2xl bg-verde-700 px-4 py-3 text-marfil"
               style={{ boxShadow: FEATURED_SHADOW }}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pistacho-200">Cafeterías</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-pistacho-200">Cafeterías</p>
                 <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-oro-300 ring-1 ring-oro-300/60"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-oro-300 ring-1 ring-oro-300/60"
                   aria-hidden="true"
                 >
-                  <Store className="h-4 w-4" aria-hidden="true" />
+                  <Store className="h-3 w-3" aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-3 font-serif text-[1.65rem] italic font-medium leading-tight sm:text-4xl">
+              <p className="mt-2 font-serif text-[1.6rem] italic font-medium leading-none">
                 {tenant.active_cafes_count}
               </p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-verde-800 ring-1 ring-inset ring-oro-300/30">
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-verde-800 ring-1 ring-inset ring-oro-300/30">
                 <div
                   className="h-full rounded-full bg-oro-300"
                   style={{ width: `${Math.min(100, (tenant.active_cafes_count / Math.max(tenant.max_cafes, 1)) * 100)}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-verde-100">de {tenant.max_cafes} permitidas</p>
+              <p className="mt-1 text-[11px] text-verde-100">de {tenant.max_cafes} permitidas</p>
             </div>
-            <Card className="animate-fade-in !p-5">
+            <Card padded={false} className="animate-fade-in !rounded-2xl px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="stat-label">Equipo</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Equipo</p>
                 <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pistacho-50 text-oro-600 ring-1 ring-oro-300/70"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pistacho-50 text-oro-600 ring-1 ring-oro-300/70"
                   aria-hidden="true"
                 >
-                  <Users className="h-4 w-4" aria-hidden="true" />
+                  <Users className="h-3 w-3" aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-3 font-serif text-[1.65rem] italic font-medium leading-tight text-verde-700 sm:text-4xl">
+              <p className="mt-2 font-serif text-[1.6rem] italic font-medium leading-none text-verde-700">
                 {tenant.active_users_count}
               </p>
               <UsageBar value={tenant.active_users_count} max={tenant.max_users} className="mt-2" />
@@ -154,13 +154,13 @@ export const Distribuidor = () => {
           </div>
 
           {/* Cafeterías */}
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <SectionTitle script="Tu red" title="Tus cafeterías" />
             <Link to="/cafeterias" className="enlace gap-1.5">
               Gestionar <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
-          <div className="mb-10 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {cafes.map((c, i) => {
               const s = byCafe[c.id] || {};
               const occ = s.mesas ? Math.round((s.ocupadas / s.mesas) * 100) : 0;
@@ -210,7 +210,7 @@ export const Distribuidor = () => {
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             <Card className="min-w-0 lg:col-span-3">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <SectionTitle script="Al momento" title="Actividad reciente" subtitle="Últimos pedidos en toda tu red" />

@@ -19,39 +19,69 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle token refresh on 401
+// Endpoints de autenticación: un 401 aquí es un error del formulario, no una sesión vencida
+const AUTH_ENDPOINTS = ['/auth/login/', '/auth/refresh/', '/auth/register/'];
+
+// Sesión perdida o vencida: limpiamos y mandamos al login con aviso.
+// Devolvemos una promesa que no se resuelve para que la pantalla no muestre
+// su propio error mientras el navegador ya está cambiando de página.
+const sesionExpirada = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login?sesion=expirada');
+  }
+  return new Promise(() => {});
+};
+
+// Una sola renovación a la vez: si varias peticiones vencen juntas, todas esperan la misma
+let renovando = null;
+const renovarAcceso = () => {
+  if (!renovando) {
+    const refresh = localStorage.getItem('refresh_token');
+    renovando = axios
+      .post(`${API_BASE_URL}/auth/refresh/`, { refresh })
+      .then(({ data }) => {
+        localStorage.setItem('access_token', data.access);
+        // Con ROTATE_REFRESH_TOKENS el backend entrega también una llave de renovación nueva
+        if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
+        return data.access;
+      })
+      .finally(() => {
+        renovando = null;
+      });
+  }
+  return renovando;
+};
+
+// Renovar el acceso cuando vence (401) y reintentar la petición una vez
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
+    const esAuth = AUTH_ENDPOINTS.some((p) => (originalRequest.url || '').includes(p));
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
-            refresh: refreshToken,
-          });
-
-          const { access } = response.data;
-          localStorage.setItem('access_token', access);
-
-          api.defaults.headers.Authorization = `Bearer ${access}`;
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
+    if (error.response?.status !== 401 || esAuth) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    // Ya se reintentó con un acceso nuevo y sigue sin autorización, o no hay cómo renovar
+    if (originalRequest._retry || !localStorage.getItem('refresh_token')) {
+      return sesionExpirada();
+    }
+
+    originalRequest._retry = true;
+    try {
+      // Si otra petición ya renovó el acceso mientras esta viajaba, basta con reintentar con el nuevo
+      const actual = localStorage.getItem('access_token');
+      const enviado = (originalRequest.headers?.Authorization || '').replace('Bearer ', '');
+      const access = actual && actual !== enviado && !renovando ? actual : await renovarAcceso();
+      originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${access}` };
+      return api(originalRequest);
+    } catch (refreshError) {
+      return sesionExpirada();
+    }
   }
 );
 

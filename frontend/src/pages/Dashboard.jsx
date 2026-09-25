@@ -109,14 +109,14 @@ export const Dashboard = () => {
           />
 
           {/* Métricas */}
-          <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {statCards.map((stat, i) => {
               const Icon = stat.icon;
               const featured = i === 0;
               return (
                 <div
                   key={stat.label}
-                  className={`animate-fade-in relative overflow-hidden rounded-3xl p-4 sm:p-5 ${
+                  className={`animate-fade-in relative overflow-hidden rounded-2xl px-4 py-3 ${
                     featured
                       ? 'bg-verde-700 text-marfil shadow-lift'
                       : 'border border-oro-200/80 bg-marfil shadow-soft'
@@ -126,39 +126,39 @@ export const Dashboard = () => {
                   {/* Aro dorado interior en la tarjeta destacada */}
                   {featured && (
                     <span
-                      className="pointer-events-none absolute inset-1.5 rounded-[1.1rem] border border-oro-400/60"
+                      className="pointer-events-none absolute inset-1 rounded-[0.8rem] border border-oro-400/60"
                       aria-hidden="true"
                     />
                   )}
                   <div className="relative flex items-center justify-between gap-2">
                     <p
-                      className={`text-[11px] font-medium uppercase tracking-[0.2em] ${
+                      className={`text-[10px] font-medium uppercase tracking-[0.16em] ${
                         featured ? 'text-oro-300' : 'text-verde-600'
                       }`}
                     >
                       {stat.label}
                     </p>
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-1 ${
                         featured
                           ? 'bg-verde-800/60 text-oro-300 ring-oro-400/50'
                           : 'bg-pistacho-100 text-cobalto-500 ring-oro-300'
                       }`}
                       aria-hidden="true"
                     >
-                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <Icon className="h-3 w-3" aria-hidden="true" />
                     </span>
                   </div>
                   <p
-                    className={`relative mt-4 font-serif text-4xl italic font-medium leading-none sm:text-[2.6rem] ${
+                    className={`relative mt-2 font-serif text-[1.6rem] italic font-medium leading-none ${
                       featured ? 'text-marfil' : 'text-verde-700'
                     }`}
                   >
                     {stat.value}
                   </p>
-                  <p className={`relative mt-3 flex items-center gap-2 text-xs ${featured ? 'text-verde-100' : 'text-verde-600'}`}>
+                  <p className={`relative mt-1.5 flex items-center gap-1.5 text-[11px] ${featured ? 'text-verde-100' : 'text-verde-600'}`}>
                     <span
-                      className={`inline-block h-1.5 w-1.5 shrink-0 rotate-45 ${featured ? 'bg-oro-300' : 'bg-oro-400'}`}
+                      className={`inline-block h-1 w-1 shrink-0 rotate-45 ${featured ? 'bg-oro-300' : 'bg-oro-400'}`}
                       aria-hidden="true"
                     />
                     {stat.hint}
@@ -168,28 +168,28 @@ export const Dashboard = () => {
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             {/* Estado de mesas */}
-            <Card className="lg:col-span-3">
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+            <Card padded={false} className="p-4 sm:p-5 lg:col-span-3">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
                 <div>
-                  <h2 className="font-serif text-2xl italic font-medium text-verde-700">Estado del salón</h2>
-                  <p className="mt-1 text-sm text-verde-600">Distribución actual de mesas</p>
+                  <h2 className="font-serif text-xl italic font-medium text-verde-700">Estado del salón</h2>
+                  <p className="text-xs text-verde-600">Distribución actual de mesas</p>
                 </div>
-                <Link to="/mesas" className="enlace shrink-0 gap-1 text-[12px]">
-                  Ver mesas <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                <Link to="/mesas" className="enlace !min-h-[32px] shrink-0 gap-1 !text-[11px]">
+                  Ver mesas <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={chartData} barSize={56}>
+              <ResponsiveContainer width="100%" height={170}>
+                <BarChart data={chartData} barSize={34} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
                   <CartesianGrid vertical={false} stroke="#E7DDBF" strokeDasharray="2 4" />
                   <XAxis
                     dataKey="name"
                     axisLine={{ stroke: '#C39B45' }}
                     tickLine={false}
-                    tick={{ fill: '#4A6334', fontSize: 12, letterSpacing: '0.08em' }}
+                    tick={{ fill: '#4A6334', fontSize: 11 }}
                   />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#4A6334', fontSize: 12 }} width={28} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#4A6334', fontSize: 11 }} width={28} />
                   <Tooltip
                     cursor={{ fill: 'rgba(191, 216, 165, 0.25)' }}
                     contentStyle={{
@@ -204,7 +204,7 @@ export const Dashboard = () => {
                     formatter={(v) => [v, 'Mesas']}
                   />
                   {/* Barras con remate en arco, como la vitrina */}
-                  <Bar dataKey="value" radius={[28, 28, 0, 0]}>
+                  <Bar dataKey="value" radius={[17, 17, 0, 0]}>
                     {chartData.map((d) => (
                       <Cell key={d.name} fill={d.color} />
                     ))}
@@ -212,42 +212,42 @@ export const Dashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
               {/* Leyenda con rombos */}
-              <ul className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 border-t border-oro-200/70 pt-4">
+              <ul className="mt-2 flex flex-wrap justify-center gap-x-5 gap-y-1 border-t border-oro-200/70 pt-2.5">
                 {chartData.map((d) => (
-                  <li key={d.name} className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rotate-45" style={{ background: d.color }} aria-hidden="true" />
-                    <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-verde-600">{d.name}</span>
-                    <span className="font-serif text-lg italic text-verde-700">{d.value}</span>
+                  <li key={d.name} className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rotate-45" style={{ background: d.color }} aria-hidden="true" />
+                    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-verde-600">{d.name}</span>
+                    <span className="font-serif text-sm italic text-verde-700">{d.value}</span>
                   </li>
                 ))}
               </ul>
             </Card>
 
             {/* Pedidos recientes */}
-            <Card className="lg:col-span-2">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+            <Card padded={false} className="p-4 sm:p-5 lg:col-span-2">
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
                 <div>
-                  <h2 className="font-serif text-2xl italic font-medium text-verde-700">Pedidos recientes</h2>
-                  <p className="mt-1 text-sm text-verde-600">Últimos movimientos</p>
+                  <h2 className="font-serif text-xl italic font-medium text-verde-700">Pedidos recientes</h2>
+                  <p className="text-xs text-verde-600">Últimos movimientos</p>
                 </div>
-                <Link to="/pedidos" className="enlace shrink-0 gap-1 text-[12px]">
-                  Todos <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                <Link to="/pedidos" className="enlace !min-h-[32px] shrink-0 gap-1 !text-[11px]">
+                  Todos <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </div>
               {pedidos.length === 0 ? (
-                <div className="py-12 text-center">
+                <div className="py-8 text-center">
                   <span className="rombo" aria-hidden="true" />
                   <p className="mt-3 font-serif text-lg italic text-verde-600">Aún no hay pedidos hoy.</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-oro-200/70">
                   {pedidos.slice(0, 5).map((pedido) => (
-                    <li key={pedido.id} className="flex items-center justify-between gap-3 py-3.5">
+                    <li key={pedido.id} className="flex items-center justify-between gap-3 py-2">
                       <div className="min-w-0">
-                        <p className="truncate font-medium tracking-wide text-verde-700">{pedido.order_number}</p>
-                        <StatusBadge status={pedido.status} className="mt-1" />
+                        <p className="truncate text-sm font-medium tracking-wide text-verde-700">{pedido.order_number}</p>
+                        <StatusBadge status={pedido.status} className="mt-0.5 !py-0.5 !text-[10px]" />
                       </div>
-                      <span className="shrink-0 font-serif text-xl italic text-verde-700">{money(pedido.total)}</span>
+                      <span className="shrink-0 font-serif text-base italic text-verde-700">{money(pedido.total)}</span>
                     </li>
                   ))}
                 </ul>

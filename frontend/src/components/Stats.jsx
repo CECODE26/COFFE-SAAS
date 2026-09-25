@@ -17,37 +17,37 @@ const FEATURED_SHADOW =
 // Tarjeta de métrica "Pistacho y oro": marfil con borde dorado; `featured` la pinta en verde bosque con aro de oro
 export const StatTile = ({ icon: Icon, label, value, hint, featured = false, delay = 0 }) => (
   <div
-    className={`animate-fade-in relative rounded-xl2 p-5 ${
+    className={`animate-fade-in relative rounded-2xl px-4 py-3 ${
       featured ? 'bg-verde-700 text-marfil' : 'border border-oro-200/80 bg-marfil shadow-soft'
     }`}
     style={{ animationDelay: `${delay}ms`, ...(featured ? { boxShadow: FEATURED_SHADOW } : {}) }}
   >
     <div className="flex items-center justify-between gap-2">
       <p
-        className={`text-[11px] font-medium uppercase tracking-[0.18em] ${featured ? 'text-pistacho-200' : 'text-verde-600'}`}
+        className={`text-[10px] font-medium uppercase tracking-[0.16em] ${featured ? 'text-pistacho-200' : 'text-verde-600'}`}
       >
         {label}
       </p>
       {Icon && (
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-1 ${
             featured ? 'text-oro-300 ring-oro-300/60' : 'bg-pistacho-50 text-oro-600 ring-oro-300/70'
           }`}
           aria-hidden="true"
         >
-          <Icon className="h-4 w-4" aria-hidden="true" />
+          <Icon className="h-3 w-3" aria-hidden="true" />
         </span>
       )}
     </div>
     <p
-      className={`mt-3 font-serif text-[1.65rem] italic font-medium leading-tight [overflow-wrap:anywhere] sm:text-4xl ${
+      className={`mt-2 font-serif text-[1.6rem] italic font-medium leading-none [overflow-wrap:anywhere] ${
         featured ? 'text-marfil' : 'text-verde-700'
       }`}
     >
       {value}
     </p>
-    <span className={`mt-2 block h-px w-8 ${featured ? 'bg-oro-300/70' : 'bg-oro-300'}`} aria-hidden="true" />
-    {hint && <p className={`mt-2 text-xs ${featured ? 'text-verde-100' : 'text-verde-600'}`}>{hint}</p>}
+    <span className={`mt-1.5 block h-px w-6 ${featured ? 'bg-oro-300/70' : 'bg-oro-300'}`} aria-hidden="true" />
+    {hint && <p className={`mt-1 text-[11px] ${featured ? 'text-verde-100' : 'text-verde-600'}`}>{hint}</p>}
   </div>
 );
 
