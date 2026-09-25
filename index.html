@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coffee Elite · Maison de café</title>
+<meta name="description" content="Coffee Elite, maison de café: café de autor y pastelería de mantequilla horneada cada mañana. Reserva tu mesa.">
+<meta name="theme-color" content="#2A4520">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/estilos.css">
+<script src="assets/js/menu.js" defer></script>
+</head>
+<body>
+
+<section class="portada" aria-label="Inicio">
+
+  <!-- Toldo a rayas con faldón festoneado -->
+  <div class="toldo" aria-hidden="true">
+    <div class="toldo__variante toldo__variante--escritorio">
+      <svg class="toldo__tela" width="100%" height="66">
+        <defs>
+          <pattern id="rayas-escritorio" width="96" height="66" patternUnits="userSpaceOnUse">
+            <rect width="48" height="66" fill="#BFD8A5"></rect>
+            <rect x="48" width="48" height="66" fill="#FFFBF1"></rect>
+          </pattern>
+          <linearGradient id="pliegue-escritorio" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#1D3316" stop-opacity=".05"></stop>
+            <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".12"></stop>
+            <stop offset="1" stop-color="#1D3316" stop-opacity=".05"></stop>
+          </linearGradient>
+          <pattern id="pliegues-escritorio" width="48" height="66" patternUnits="userSpaceOnUse"><rect width="48" height="66" fill="url(#pliegue-escritorio)"></rect></pattern>
+          <linearGradient id="sombra-escritorio" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1D3316" stop-opacity=".22"></stop>
+            <stop offset=".45" stop-color="#1D3316" stop-opacity="0"></stop>
+            <stop offset="1" stop-color="#1D3316" stop-opacity=".06"></stop>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="66" fill="url(#rayas-escritorio)"></rect>
+        <rect width="100%" height="66" fill="url(#pliegues-escritorio)"></rect>
+        <rect width="100%" height="66" fill="url(#sombra-escritorio)"></rect>
+        <rect width="100%" height="10" fill="#2A4520"></rect>
+        <rect y="10" width="100%" height="2" fill="#C39B45"></rect>
+      </svg>
+      <svg class="toldo__faldon" width="100%" height="28" style="top: 65px">
+        <defs>
+          <pattern id="festones-escritorio" width="96" height="28" patternUnits="userSpaceOnUse">
+            <path d="M0 0H48V2A24 24 0 0 1 0 2Z" fill="#BFD8A5"></path>
+            <path d="M48 0H96V2A24 24 0 0 1 48 2Z" fill="#FFFBF1"></path>
+            <path d="M48 2A24 24 0 0 1 0 2" fill="none" stroke="#C39B45" stroke-width="1.6"></path>
+            <path d="M96 2A24 24 0 0 1 48 2" fill="none" stroke="#C39B45" stroke-width="1.6"></path>
+          </pattern>
+        </defs>
+        <rect width="100%" height="28" fill="url(#festones-escritorio)"></rect>
+      </svg>
+    </div>
+    <div class="toldo__variante toldo__variante--movil">
+      <svg class="toldo__tela" width="100%" height="44">
+        <defs>
+          <pattern id="rayas-movil" width="52" height="44" patternUnits="userSpaceOnUse">
+            <rect width="26" height="44" fill="#BFD8A5"></rect>
+            <rect x="26" width="26" height="44" fill="#FFFBF1"></rect>
+          </pattern>
+          <linearGradient id="pliegue-movil" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#1D3316" stop-opacity=".05"></stop>
+            <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".12"></stop>
+            <stop offset="1" stop-color="#1D3316" stop-opacity=".05"></stop>
+          </linearGradient>
+          <pattern id="pliegues-movil" width="26" height="44" patternUnits="userSpaceOnUse"><rect width="26" height="44" fill="url(#pliegue-movil)"></rect></pattern>
+          <linearGradient id="sombra-movil" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1D3316" stop-opacity=".22"></stop>
+            <stop offset=".45" stop-color="#1D3316" stop-opacity="0"></stop>
+            <stop offset="1" stop-color="#1D3316" stop-opacity=".06"></stop>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="44" fill="url(#rayas-movil)"></rect>
+        <rect width="100%" height="44" fill="url(#pliegues-movil)"></rect>
+        <rect width="100%" height="44" fill="url(#sombra-movil)"></rect>
+        <rect width="100%" height="7" fill="#2A4520"></rect>
+        <rect y="7" width="100%" height="1.5" fill="#C39B45"></rect>
+      </svg>
+      <svg class="toldo__faldon" width="100%" height="16" style="top: 43px">
+        <defs>
+          <pattern id="festones-movil" width="52" height="16" patternUnits="userSpaceOnUse">
+            <path d="M0 0H26V1.5A13 13 0 0 1 0 1.5Z" fill="#BFD8A5"></path>
+            <path d="M26 0H52V1.5A13 13 0 0 1 26 1.5Z" fill="#FFFBF1"></path>
+            <path d="M26 1.5A13 13 0 0 1 0 1.5" fill="none" stroke="#C39B45" stroke-width="1.2"></path>
+            <path d="M52 1.5A13 13 0 0 1 26 1.5" fill="none" stroke="#C39B45" stroke-width="1.2"></path>
+          </pattern>
+        </defs>
+        <rect width="100%" height="16" fill="url(#festones-movil)"></rect>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Cabecera -->
+  <header class="cabecera">
+    <a class="logo" href="#" aria-label="Coffee Elite, inicio">
+      <svg class="logo__sello" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M44.00 24.00A4.54 4.54 0 0 1 42.02 32.68A4.54 4.54 0 0 1 36.47 39.64A4.54 4.54 0 0 1 28.45 43.50A4.54 4.54 0 0 1 19.55 43.50A4.54 4.54 0 0 1 11.53 39.64A4.54 4.54 0 0 1 5.98 32.68A4.54 4.54 0 0 1 4.00 24.00A4.54 4.54 0 0 1 5.98 15.32A4.54 4.54 0 0 1 11.53 8.36A4.54 4.54 0 0 1 19.55 4.50A4.54 4.54 0 0 1 28.45 4.50A4.54 4.54 0 0 1 36.47 8.36A4.54 4.54 0 0 1 42.02 15.32A4.54 4.54 0 0 1 44.00 24.00Z" fill="#FFFDF7" stroke="#C39B45" stroke-width="1.2"></path>
+        <circle cx="24" cy="24" r="15.5" fill="none" stroke="#22409A" stroke-width="1.1"></circle>
+        <circle cx="24" cy="24" r="17.6" fill="none" stroke="#22409A" stroke-width="1.6" stroke-dasharray="0 4.6" stroke-linecap="round"></circle>
+        <text x="24" y="29.2" text-anchor="middle" font-family="'Playfair Display', serif" font-style="italic" font-size="15" fill="#22409A">CE</text>
+      </svg>
+    </a>
+    <nav class="menu" id="menu-principal" aria-label="Principal">
+      <a class="menu__enlace" href="#carta">Carta</a>
+      <a class="menu__enlace" href="#pasteleria">Pastelería</a>
+      <a class="menu__enlace" href="#nosotros">Nosotros</a>
+      <a class="menu__enlace" href="#ubicacion">Ubicación</a>
+    </nav>
+    <p class="horario">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+      <span>[Horario]</span>
+    </p>
+    <span class="cabecera__maison" aria-hidden="true">Maison de café</span>
+    <button class="boton-menu" type="button" aria-expanded="false" aria-controls="menu-principal" aria-label="Abrir menú">
+      <svg width="26" height="18" viewBox="0 0 26 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1 2h24M1 9h24M7 16h18"></path></svg>
+    </button>
+  </header>
+
+  <div class="escena">
+
+    <!-- Texto principal -->
+    <div class="texto">
+      <p class="texto__maison">Maison de café</p>
+      <h1 class="texto__marca"><span>Coffee</span> <span class="texto__marca-2">Elite</span></h1>
+      <p class="texto__lema">El croissant, aún tibio.<br>El café, en <em>porcelana</em>.</p>
+      <p class="texto__desc">Café de autor y pastelería de mantequilla horneada cada mañana<span class="solo-escritorio">, para disfrutar sin prisa</span>.</p>
+      <div class="acciones">
+        <a class="boton" href="#reservas">Reserva tu mesa</a>
+        <a class="enlace" href="#carta">Ver la carta</a>
+      </div>
+    </div>
+
+    <!-- Vitrina en arco con la foto -->
+    <div class="vitrina">
+      <div class="vitrina__contorno" aria-hidden="true"></div>
+      <div class="vitrina__arco">
+        <div class="vitrina__marco">
+          <div class="vitrina__foto">
+            <img src="assets/img/croissant.jpg" width="900" height="600" alt="Croissant de mantequilla recién horneado sobre una bandeja de madera, con fondo verde desenfocado">
+            <div class="vitrina__luz" aria-hidden="true"></div>
+            <svg class="vitrina__abanico" viewBox="0 0 344 176" aria-hidden="true">
+              <g stroke="#FFFBF1" stroke-width="5" fill="none" style="filter: drop-shadow(0 2px 2px rgba(29,51,22,.35));">
+                <line x1="0" y1="172" x2="344" y2="172" stroke-width="7"></line>
+                <path d="M126 172A46 46 0 0 1 218 172"></path>
+                <line x1="172" y1="126" x2="172" y2="0"></line>
+                <line x1="139.5" y1="139.5" x2="50.4" y2="50.4"></line>
+                <line x1="204.5" y1="139.5" x2="293.6" y2="50.4"></line>
+                <line x1="129.5" y1="154" x2="12" y2="104"></line>
+                <line x1="214.5" y1="154" x2="332" y2="104"></line>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="sello">
+        <svg class="sello__aro" viewBox="0 0 148 148" aria-hidden="true">
+          <defs><path id="hd-ring" d="M74 74m-54 0a54 54 0 1 1 108 0a54 54 0 1 1 -108 0"></path></defs>
+          <circle cx="74" cy="74" r="72" fill="#22409A"></circle>
+          <circle cx="74" cy="74" r="67" fill="none" stroke="#D8B45C" stroke-width="1"></circle>
+          <circle cx="74" cy="74" r="40" fill="none" stroke="#D8B45C" stroke-width="1"></circle>
+          <text font-family="'Jost', sans-serif" font-size="11.5" font-weight="500" letter-spacing="4.05" fill="#FFFBF1"><textPath href="#hd-ring">RECIÉN HORNEADO · CADA MAÑANA ·</textPath></text>
+        </svg>
+        <svg class="sello__icono" viewBox="0 0 148 148" aria-hidden="true">
+          <g transform="translate(74 78)">
+            <path d="M-25 9C-24 -5 -13 -13 0 -13C13 -13 24 -5 25 9C19 4 12 1.5 0 1.5C-12 1.5 -19 4 -25 9Z" fill="#D8B45C"></path>
+            <g fill="none" stroke="#22409A" stroke-width="1.5" stroke-linecap="round">
+              <path d="M-6.5 -12.2C-4.5 -6 -4.5 -2 -5.5 1.8"></path>
+              <path d="M6.5 -12.2C4.5 -6 4.5 -2 5.5 1.8"></path>
+              <path d="M-16.5 -8C-13 -4 -12.5 0 -13.5 3"></path>
+              <path d="M16.5 -8C13 -4 12.5 0 13.5 3"></path>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <svg class="taza-movil" viewBox="0 0 260 300" aria-hidden="true">
+        <defs>
+          <linearGradient id="hm-porc" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#E4E8EC"></stop>
+            <stop offset=".38" stop-color="#FFFFFF"></stop>
+            <stop offset=".75" stop-color="#FBFAF6"></stop>
+            <stop offset="1" stop-color="#DDE2E6"></stop>
+          </linearGradient>
+          <linearGradient id="hm-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#EAD39A"></stop>
+            <stop offset=".45" stop-color="#B38A36"></stop>
+            <stop offset=".7" stop-color="#E6CB85"></stop>
+            <stop offset="1" stop-color="#9C7429"></stop>
+          </linearGradient>
+          <radialGradient id="hm-pist" cx=".45" cy=".4" r=".7">
+            <stop offset="0" stop-color="#CFE3B4"></stop>
+            <stop offset="1" stop-color="#9DBE7C"></stop>
+          </radialGradient>
+          <clipPath id="hm-body"><path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176Z"></path></clipPath>
+          <g id="hm-flower">
+            <circle cx="0" cy="-4.6" r="3.6"></circle><circle cx="4.4" cy="-1.4" r="3.6"></circle><circle cx="2.7" cy="3.7" r="3.6"></circle><circle cx="-2.7" cy="3.7" r="3.6"></circle><circle cx="-4.4" cy="-1.4" r="3.6"></circle>
+          </g>
+        </defs>
+        <path d="M242.00 120.00A14.91 14.91 0 0 1 238.18 148.99A14.91 14.91 0 0 1 226.99 176.00A14.91 14.91 0 0 1 209.20 199.20A14.91 14.91 0 0 1 186.00 216.99A14.91 14.91 0 0 1 158.99 228.18A14.91 14.91 0 0 1 130.00 232.00A14.91 14.91 0 0 1 101.01 228.18A14.91 14.91 0 0 1 74.00 216.99A14.91 14.91 0 0 1 50.80 199.20A14.91 14.91 0 0 1 33.01 176.00A14.91 14.91 0 0 1 21.82 148.99A14.91 14.91 0 0 1 18.00 120.00A14.91 14.91 0 0 1 21.82 91.01A14.91 14.91 0 0 1 33.01 64.00A14.91 14.91 0 0 1 50.80 40.80A14.91 14.91 0 0 1 74.00 23.01A14.91 14.91 0 0 1 101.01 11.82A14.91 14.91 0 0 1 130.00 8.00A14.91 14.91 0 0 1 158.99 11.82A14.91 14.91 0 0 1 186.00 23.01A14.91 14.91 0 0 1 209.20 40.80A14.91 14.91 0 0 1 226.99 64.00A14.91 14.91 0 0 1 238.18 91.01A14.91 14.91 0 0 1 242.00 120.00Z" fill="#FFFDF7" stroke="url(#hm-gold)" stroke-width="3.4" style="filter: drop-shadow(0 5px 8px rgba(42,69,32,.18));"></path>
+        <circle cx="130" cy="120" r="101" fill="none" stroke="#22409A" stroke-width="5" stroke-dasharray="0 26.44" stroke-linecap="round"></circle>
+        <circle cx="130" cy="120" r="94" fill="none" stroke="#22409A" stroke-width="2.6"></circle>
+        <circle cx="130" cy="120" r="62" fill="#F1F6EA" stroke="#C39B45" stroke-width="1.6"></circle>
+        <g fill="none" stroke="#7FA35E" stroke-width="5.5" stroke-linecap="round" stroke-opacity=".85">
+          <path class="vapor vapor-1" d="M110 142C104 128 116 120 110 106C105 95 112 87 110 76"></path>
+          <path class="vapor vapor-2" d="M130 136C124 120 137 111 130 95C125 83 133 74 130 60"></path>
+          <path class="vapor vapor-3" d="M150 142C144 128 156 120 150 106C145 95 152 87 150 76"></path>
+        </g>
+        <g transform="translate(130 252) scale(1.16) translate(-130 -252)">
+          <ellipse cx="130" cy="252" rx="98" ry="20" fill="#1D3316" opacity=".12"></ellipse>
+          <ellipse cx="130" cy="246" rx="96" ry="21" fill="url(#hm-porc)" stroke="url(#hm-gold)" stroke-width="3"></ellipse>
+          <ellipse cx="130" cy="245" rx="70" ry="14" fill="none" stroke="#22409A" stroke-width="2"></ellipse>
+          <path d="M186 188C226 176 230 226 178 222" fill="none" stroke="url(#hm-gold)" stroke-width="9" stroke-linecap="round"></path>
+          <ellipse cx="130" cy="242" rx="32" ry="6.5" fill="#F4F2EC" stroke="#C39B45" stroke-width="1.6"></ellipse>
+          <path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176Z" fill="url(#hm-porc)"></path>
+          <g clip-path="url(#hm-body)">
+            <path d="M66 188A64 16 0 0 0 194 188" fill="none" stroke="#22409A" stroke-width="3.2"></path>
+            <g fill="#22409A">
+              <use href="#hm-flower" x="104" y="214"></use>
+              <use href="#hm-flower" x="156" y="216"></use>
+              <ellipse cx="116" cy="220" rx="6" ry="2.4" transform="rotate(30 116 220)"></ellipse>
+              <ellipse cx="92" cy="222" rx="6" ry="2.4" transform="rotate(-35 92 222)"></ellipse>
+              <ellipse cx="144" cy="222" rx="6" ry="2.4" transform="rotate(-30 144 222)"></ellipse>
+              <ellipse cx="168" cy="224" rx="6" ry="2.4" transform="rotate(35 168 224)"></ellipse>
+            </g>
+            <g fill="#D8B45C"><circle cx="104" cy="214" r="2"></circle><circle cx="156" cy="216" r="2"></circle></g>
+            <path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176" fill="none" stroke="#C39B45" stroke-width="1.4"></path>
+          </g>
+          <ellipse cx="130" cy="176" rx="64" ry="16" fill="#EEF0EE" stroke="url(#hm-gold)" stroke-width="3.2"></ellipse>
+          <ellipse cx="130" cy="179" rx="57" ry="12" fill="url(#hm-pist)"></ellipse>
+          <path d="M130 175C123 168 110 172 118 179C122 183 128 185 130 188C132 185 138 183 142 179C150 172 137 168 130 175Z" fill="#F7F3E2" opacity=".92"></path>
+        </g>
+      </svg>
+    </div>
+
+    <!-- La firma de la casa -->
+    <aside class="firma" aria-label="La firma de la casa">
+      <svg class="taza" viewBox="0 0 260 300" aria-hidden="true">
+        <defs>
+          <linearGradient id="hd-porc" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#E4E8EC"></stop>
+            <stop offset=".38" stop-color="#FFFFFF"></stop>
+            <stop offset=".75" stop-color="#FBFAF6"></stop>
+            <stop offset="1" stop-color="#DDE2E6"></stop>
+          </linearGradient>
+          <linearGradient id="hd-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#EAD39A"></stop>
+            <stop offset=".45" stop-color="#B38A36"></stop>
+            <stop offset=".7" stop-color="#E6CB85"></stop>
+            <stop offset="1" stop-color="#9C7429"></stop>
+          </linearGradient>
+          <radialGradient id="hd-pist" cx=".45" cy=".4" r=".7">
+            <stop offset="0" stop-color="#CFE3B4"></stop>
+            <stop offset="1" stop-color="#9DBE7C"></stop>
+          </radialGradient>
+          <clipPath id="hd-body"><path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176Z"></path></clipPath>
+          <g id="hd-flower">
+            <circle cx="0" cy="-4.6" r="3.6"></circle><circle cx="4.4" cy="-1.4" r="3.6"></circle><circle cx="2.7" cy="3.7" r="3.6"></circle><circle cx="-2.7" cy="3.7" r="3.6"></circle><circle cx="-4.4" cy="-1.4" r="3.6"></circle>
+          </g>
+        </defs>
+        <!-- plato festoneado de porcelana -->
+        <path d="M242.00 120.00A14.91 14.91 0 0 1 238.18 148.99A14.91 14.91 0 0 1 226.99 176.00A14.91 14.91 0 0 1 209.20 199.20A14.91 14.91 0 0 1 186.00 216.99A14.91 14.91 0 0 1 158.99 228.18A14.91 14.91 0 0 1 130.00 232.00A14.91 14.91 0 0 1 101.01 228.18A14.91 14.91 0 0 1 74.00 216.99A14.91 14.91 0 0 1 50.80 199.20A14.91 14.91 0 0 1 33.01 176.00A14.91 14.91 0 0 1 21.82 148.99A14.91 14.91 0 0 1 18.00 120.00A14.91 14.91 0 0 1 21.82 91.01A14.91 14.91 0 0 1 33.01 64.00A14.91 14.91 0 0 1 50.80 40.80A14.91 14.91 0 0 1 74.00 23.01A14.91 14.91 0 0 1 101.01 11.82A14.91 14.91 0 0 1 130.00 8.00A14.91 14.91 0 0 1 158.99 11.82A14.91 14.91 0 0 1 186.00 23.01A14.91 14.91 0 0 1 209.20 40.80A14.91 14.91 0 0 1 226.99 64.00A14.91 14.91 0 0 1 238.18 91.01A14.91 14.91 0 0 1 242.00 120.00Z" fill="#FFFDF7" stroke="url(#hd-gold)" stroke-width="2.4" style="filter: drop-shadow(0 6px 10px rgba(42,69,32,.14));"></path>
+        <circle cx="130" cy="120" r="101" fill="none" stroke="#22409A" stroke-width="3.6" stroke-dasharray="0 26.44" stroke-linecap="round"></circle>
+        <circle cx="130" cy="120" r="94" fill="none" stroke="#22409A" stroke-width="1.8"></circle>
+        <circle cx="130" cy="120" r="89" fill="none" stroke="#22409A" stroke-width=".8"></circle>
+        <circle cx="130" cy="120" r="62" fill="#F1F6EA" stroke="#C39B45" stroke-width="1"></circle>
+        <!-- vapor -->
+        <g fill="none" stroke="#7FA35E" stroke-width="4" stroke-linecap="round" stroke-opacity=".85">
+          <path class="vapor vapor-1" d="M110 142C104 128 116 120 110 106C105 95 112 87 110 76"></path>
+          <path class="vapor vapor-2" d="M130 136C124 120 137 111 130 95C125 83 133 74 130 60"></path>
+          <path class="vapor vapor-3" d="M150 142C144 128 156 120 150 106C145 95 152 87 150 76"></path>
+        </g>
+        <g transform="translate(130 252) scale(1.16) translate(-130 -252)">
+        <!-- platillo -->
+        <ellipse cx="130" cy="252" rx="98" ry="20" fill="#1D3316" opacity=".12"></ellipse>
+        <ellipse cx="130" cy="246" rx="96" ry="21" fill="url(#hd-porc)" stroke="url(#hd-gold)" stroke-width="2.2"></ellipse>
+        <ellipse cx="130" cy="245" rx="70" ry="14" fill="none" stroke="#22409A" stroke-width="1.4"></ellipse>
+        <!-- asa dorada -->
+        <path d="M186 188C226 176 230 226 178 222" fill="none" stroke="url(#hd-gold)" stroke-width="8" stroke-linecap="round"></path>
+        <!-- cuerpo -->
+        <ellipse cx="130" cy="242" rx="32" ry="6.5" fill="#F4F2EC" stroke="#C39B45" stroke-width="1.2"></ellipse>
+        <path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176Z" fill="url(#hd-porc)"></path>
+        <g clip-path="url(#hd-body)">
+          <path d="M66 188A64 16 0 0 0 194 188" fill="none" stroke="#22409A" stroke-width="2.4"></path>
+          <path d="M66 194A64 16 0 0 0 194 194" fill="none" stroke="#22409A" stroke-width="1" stroke-dasharray="0 6" stroke-linecap="round"></path>
+          <g fill="#22409A">
+            <use href="#hd-flower" x="104" y="214"></use>
+            <use href="#hd-flower" x="156" y="216"></use>
+            <use href="#hd-flower" x="130" y="228" transform="translate(130 228) scale(.7) translate(-130 -228)"></use>
+            <ellipse cx="116" cy="220" rx="6" ry="2.2" transform="rotate(30 116 220)"></ellipse>
+            <ellipse cx="92" cy="222" rx="6" ry="2.2" transform="rotate(-35 92 222)"></ellipse>
+            <ellipse cx="144" cy="222" rx="6" ry="2.2" transform="rotate(-30 144 222)"></ellipse>
+            <ellipse cx="168" cy="224" rx="6" ry="2.2" transform="rotate(35 168 224)"></ellipse>
+          </g>
+          <g fill="#D8B45C"><circle cx="104" cy="214" r="1.8"></circle><circle cx="156" cy="216" r="1.8"></circle><circle cx="130" cy="228" r="1.4"></circle></g>
+          <path d="M66 176C66 214 92 240 130 240C168 240 194 214 194 176" fill="none" stroke="#C39B45" stroke-width="1"></path>
+        </g>
+        <!-- borde y crema de pistacho -->
+        <ellipse cx="130" cy="176" rx="64" ry="16" fill="#EEF0EE" stroke="url(#hd-gold)" stroke-width="2.6"></ellipse>
+        <ellipse cx="130" cy="179" rx="57" ry="12" fill="url(#hd-pist)"></ellipse>
+        <path d="M130 175C123 168 110 172 118 179C122 183 128 185 130 188C132 185 138 183 142 179C150 172 137 168 130 175Z" fill="#F7F3E2" opacity=".92"></path>
+        <g fill="#6F9150"><circle cx="100" cy="180" r="1.3"></circle><circle cx="106" cy="185" r="1"></circle><circle cx="158" cy="176" r="1.2"></circle><circle cx="152" cy="184" r="1"></circle><circle cx="146" cy="172" r="1"></circle></g>
+        </g>
+      </svg>
+      <div class="cinta-firma">
+        <span class="cinta-firma__punta cinta-firma__punta--izq" aria-hidden="true"></span>
+        <span class="cinta-firma__punta cinta-firma__punta--der" aria-hidden="true"></span>
+        <span class="cinta-firma__pliegue cinta-firma__pliegue--izq" aria-hidden="true"></span>
+        <span class="cinta-firma__pliegue cinta-firma__pliegue--der" aria-hidden="true"></span>
+        <p class="cinta-firma__texto"><span class="cinta-firma__etiqueta">La firma<span class="solo-escritorio"> de la casa</span></span> <span class="cinta-firma__nombre solo-movil">Latte de pistacho</span></p>
+      </div>
+      <p class="firma__nombre solo-escritorio">Latte de pistacho</p>
+      <p class="firma__desc solo-escritorio">Espresso, leche sedosa y crema de pistacho tostado.</p>
+    </aside>
+
+  </div>
+
+  <!-- Cinta con la carta -->
+  <div class="carta-cinta">
+    <div class="carta-cinta__pista">
+      <ul class="carta-cinta__grupo" aria-label="De la carta">
+        <li>Latte de pistacho</li>
+        <li>Croissant de mantequilla</li>
+        <li>Espresso tónico</li>
+        <li>Pain au chocolat</li>
+        <li>Capuchino</li>
+        <li aria-hidden="true">Latte de pistacho</li>
+        <li aria-hidden="true">Croissant de mantequilla</li>
+        <li aria-hidden="true">Espresso tónico</li>
+        <li aria-hidden="true">Pain au chocolat</li>
+        <li aria-hidden="true">Capuchino</li>
+        <li aria-hidden="true">Latte de pistacho</li>
+        <li aria-hidden="true">Croissant de mantequilla</li>
+        <li aria-hidden="true">Espresso tónico</li>
+        <li aria-hidden="true">Pain au chocolat</li>
+        <li aria-hidden="true">Capuchino</li>
+      </ul>
+      <ul class="carta-cinta__grupo" aria-hidden="true">
+        <li>Latte de pistacho</li>
+        <li>Croissant de mantequilla</li>
+        <li>Espresso tónico</li>
+        <li>Pain au chocolat</li>
+        <li>Capuchino</li>
+        <li>Latte de pistacho</li>
+        <li>Croissant de mantequilla</li>
+        <li>Espresso tónico</li>
+        <li>Pain au chocolat</li>
+        <li>Capuchino</li>
+        <li>Latte de pistacho</li>
+        <li>Croissant de mantequilla</li>
+        <li>Espresso tónico</li>
+        <li>Pain au chocolat</li>
+        <li>Capuchino</li>
+      </ul>
+    </div>
+  </div>
+
+</section>
+
+</body>
+</html>

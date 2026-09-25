@@ -1,0 +1,794 @@
+/* Coffee Elite · Portada "Pistacho y oro" */
+
+:root {
+  --crema: #FBF6EA;
+  --marfil: #FFFBF1;
+  --pistacho: #BFD8A5;
+  --pistacho-medio: #A3C486;
+  --pistacho-oscuro: #7C9E5C;
+  --verde: #2A4520;
+  --verde-suave: #4A6334;
+  --verde-tinta: #1F3517;
+  --cobalto: #22409A;
+  --oro: #C39B45;
+  --oro-claro: #D8B45C;
+  --oro-viejo: #8F6B21;
+
+  --serif: 'Playfair Display', 'Didot', Georgia, serif;
+  --sans: 'Jost', 'Futura', 'Century Gothic', sans-serif;
+  --manuscrita: 'Parisienne', 'Snell Roundhand', cursive;
+
+  --margen: clamp(20px, 6.67vw, 96px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--crema);
+  color: var(--verde);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+  display: block;
+}
+
+a {
+  color: var(--verde);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--cobalto);
+  outline-offset: 4px;
+}
+
+.solo-movil {
+  display: none;
+}
+
+/* ---------- Portada ---------- */
+
+.portada {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--crema);
+  background-image: repeating-linear-gradient(90deg, rgba(191, 216, 165, .22) 0 1px, transparent 1px 48px);
+}
+
+/* Toldo */
+.toldo {
+  position: relative;
+  flex: none;
+  height: 93px;
+}
+
+.toldo__variante {
+  position: absolute;
+  inset: 0;
+}
+
+.toldo__variante--movil {
+  display: none;
+}
+
+.toldo__tela {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.toldo__faldon {
+  position: absolute;
+  left: 0;
+  filter: drop-shadow(0 7px 6px rgba(42, 69, 32, .16));
+  transform-origin: 50% 0;
+}
+
+/* Cabecera */
+.cabecera {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 44px;
+  width: calc(100% - 2 * var(--margen));
+  max-width: 1248px;
+  height: 52px;
+  margin: 15px auto 0;
+}
+
+.logo {
+  display: flex;
+  flex: none;
+  text-decoration: none;
+}
+
+.logo svg {
+  width: 52px;
+  height: 52px;
+}
+
+.menu {
+  display: flex;
+  gap: 36px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+
+.menu__enlace {
+  padding: 12px 0;
+  color: var(--verde);
+  text-decoration: none;
+  transition: color .2s;
+}
+
+.menu__enlace:hover {
+  color: var(--cobalto);
+}
+
+.horario {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0 auto;
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--verde-suave);
+}
+
+.cabecera__maison,
+.boton-menu {
+  display: none;
+}
+
+/* Escena: texto · vitrina · firma */
+.escena {
+  --arco: clamp(300px, min(28.6vw, calc((100svh - 250px) * .572)), 412px);
+  --firma: clamp(220px, 20.5vw, 296px);
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--arco) var(--firma);
+  grid-template-areas: "texto vitrina firma";
+  column-gap: 16px;
+  align-items: center;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px var(--margen) 0;
+}
+
+/* Texto */
+.texto {
+  grid-area: texto;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  padding: 16px 0 40px;
+}
+
+.texto__maison {
+  margin: 0 0 0 4px;
+  font-family: var(--manuscrita);
+  font-size: clamp(26px, 2.36vw, 34px);
+  line-height: 1;
+  color: var(--oro-viejo);
+}
+
+.texto__marca {
+  margin: 4px 0 0 -.04em;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(76px, min(9.86vw, 15.8svh), 142px);
+  line-height: .96;
+  letter-spacing: -.01em;
+  color: var(--verde);
+}
+
+.texto__marca span {
+  display: block;
+}
+
+.texto__marca .texto__marca-2 {
+  padding-left: 1.06em;
+}
+
+.texto__lema {
+  margin: .9em 0 0;
+  font-family: var(--serif);
+  font-size: clamp(24px, min(2.36vw, 3.8svh), 34px);
+  line-height: 1.18;
+  color: var(--verde);
+}
+
+.texto__lema em {
+  font-style: italic;
+  color: var(--cobalto);
+}
+
+.texto__desc {
+  margin: 16px 0 0;
+  max-width: 430px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--verde-suave);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 32px;
+  margin-top: 30px;
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 58px;
+  padding: 0 38px;
+  border-radius: 999px;
+  background-color: var(--verde);
+  color: var(--marfil);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 4px var(--verde), inset 0 0 0 5px #C9A64F;
+  transition: background-color .2s, box-shadow .2s, transform .2s;
+}
+
+.boton:hover {
+  background-color: var(--cobalto);
+  box-shadow: inset 0 0 0 4px var(--cobalto), inset 0 0 0 5px #C9A64F;
+  transform: translateY(-1px);
+}
+
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--verde);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 7px;
+  text-decoration-color: var(--oro);
+  transition: color .2s;
+}
+
+.enlace:hover {
+  color: var(--cobalto);
+}
+
+/* Vitrina en arco */
+.vitrina {
+  grid-area: vitrina;
+  position: relative;
+  align-self: end;
+  width: var(--arco);
+  aspect-ratio: 412 / 720;
+}
+
+.vitrina__contorno {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(195, 155, 69, .7);
+  border-bottom: 0;
+  border-radius: 9999px 9999px 0 0;
+}
+
+.vitrina__arco {
+  position: absolute;
+  inset: 16px 16px 0;
+  border-radius: 9999px 9999px 0 0;
+  background: linear-gradient(180deg, #C9DEB2 0%, #BFD8A5 60%, #B3CF96 100%);
+  box-shadow: inset 0 0 0 1px rgba(42, 69, 32, .18);
+}
+
+.vitrina__marco {
+  position: absolute;
+  inset: 15px 15px 0;
+  padding: 3px 3px 0;
+  border-radius: 9999px 9999px 0 0;
+  background: linear-gradient(135deg, #E6CB85, #B38A36 45%, #EAD39A 70%, #A67F2E);
+}
+
+.vitrina__foto {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 9999px 9999px 0 0;
+  background: #6E8A55;
+}
+
+.vitrina__foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 53% 50%;
+  filter: saturate(1.1) brightness(1.07) contrast(1.03) sepia(.06);
+}
+
+.vitrina__luz {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 70% at 30% 10%, rgba(255, 244, 214, .35), rgba(255, 244, 214, 0) 60%);
+  mix-blend-mode: soft-light;
+}
+
+.vitrina__abanico {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: auto;
+}
+
+/* Sello giratorio */
+.sello {
+  position: absolute;
+  left: -13.6%;
+  top: 12.2%;
+  width: 36%;
+  aspect-ratio: 1;
+}
+
+.sello svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.taza-movil {
+  display: none;
+}
+
+/* La firma de la casa */
+.firma {
+  grid-area: firma;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  padding-bottom: 40px;
+}
+
+.firma > svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.cinta-firma {
+  position: relative;
+  display: flex;
+  margin-top: 14px;
+}
+
+.cinta-firma__punta {
+  position: absolute;
+  top: 6px;
+  width: 32px;
+  height: 30px;
+  background: var(--pistacho-medio);
+}
+
+.cinta-firma__punta--izq {
+  left: -18px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
+}
+
+.cinta-firma__punta--der {
+  right: -18px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%);
+}
+
+.cinta-firma__pliegue {
+  position: absolute;
+  top: 30px;
+  width: 14px;
+  height: 6px;
+  background: var(--pistacho-oscuro);
+}
+
+.cinta-firma__pliegue--izq {
+  left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.cinta-firma__pliegue--der {
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.cinta-firma__texto {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  margin: 0;
+  padding: 0 24px;
+  background: var(--pistacho);
+  color: var(--verde-tinta);
+}
+
+.cinta-firma__etiqueta {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+
+.cinta-firma__nombre {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 18px;
+}
+
+.firma__nombre {
+  margin: 16px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(26px, 2.22vw, 32px);
+  line-height: 1.1;
+  text-align: center;
+  color: var(--verde);
+}
+
+.firma__desc {
+  margin: 8px 0 0;
+  max-width: 230px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--verde-suave);
+}
+
+/* Cinta con la carta */
+.carta-cinta {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 50px;
+  overflow: hidden;
+  background: var(--cobalto);
+  border-top: 2px solid var(--oro-claro);
+}
+
+.carta-cinta__pista {
+  display: flex;
+  flex: none;
+  white-space: nowrap;
+}
+
+.carta-cinta__grupo {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  margin: 0;
+  padding: 0 34px 0 0;
+  list-style: none;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 21px;
+  color: var(--marfil);
+}
+
+.carta-cinta__grupo li {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+}
+
+.carta-cinta__grupo li::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  background: var(--oro-claro);
+  transform: rotate(45deg) scale(.72);
+}
+
+/* ---------- Animaciones ---------- */
+
+.vapor {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@keyframes vapor {
+  0% { opacity: 0; transform: translateY(10px) scaleY(.85); }
+  35% { opacity: .9; }
+  100% { opacity: 0; transform: translateY(-18px) scaleY(1.12); }
+}
+
+@keyframes desfile {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes giro {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ondear {
+  0%, 100% { transform: scaleY(1) skewX(0deg); }
+  50% { transform: scaleY(1.08) skewX(.5deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vapor { animation: vapor 3.6s ease-in-out infinite both; }
+  .vapor-1 { animation-delay: -.3s; }
+  .vapor-2 { animation-delay: -1.2s; }
+  .vapor-3 { animation-delay: -2.4s; }
+  .carta-cinta__pista { animation: desfile 46s linear infinite; }
+  .sello__aro { animation: giro 28s linear infinite; }
+  .toldo__faldon { animation: ondear 5.5s ease-in-out infinite; }
+}
+
+/* ---------- Pantallas medianas ---------- */
+
+@media (max-width: 1180px) {
+  .cabecera { gap: 32px; }
+  .menu { gap: 26px; }
+}
+
+/* ---------- Tablet y móvil ---------- */
+
+@media (max-width: 1099px) {
+  .solo-escritorio { display: none; }
+  .solo-movil { display: inline; }
+
+  .portada {
+    background-image: repeating-linear-gradient(90deg, rgba(191, 216, 165, .22) 0 1px, transparent 1px 26px);
+  }
+
+  .toldo { height: 59px; }
+  .toldo__variante--escritorio { display: none; }
+  .toldo__variante--movil { display: block; }
+  .toldo__variante--movil .toldo__faldon { filter: drop-shadow(0 5px 4px rgba(42, 69, 32, .16)); }
+
+  .cabecera {
+    justify-content: space-between;
+    gap: 12px;
+    width: auto;
+    max-width: none;
+    height: 48px;
+    margin: 9px 16px 0;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo svg {
+    width: 46px;
+    height: 46px;
+  }
+
+  .horario { display: none; }
+
+  .cabecera__maison {
+    display: block;
+    font-family: var(--manuscrita);
+    font-size: 26px;
+    line-height: 1;
+    color: var(--oro-viejo);
+  }
+
+  .boton-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--verde);
+    cursor: pointer;
+  }
+
+  .menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    min-width: 220px;
+    padding: 8px 0;
+    background: var(--marfil);
+    border: 1px solid rgba(195, 155, 69, .7);
+    border-radius: 14px;
+    box-shadow: 0 16px 32px rgba(42, 69, 32, .16);
+  }
+
+  .cabecera.menu-abierto .menu { display: flex; }
+
+  .menu__enlace {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 22px;
+  }
+
+  .escena {
+    --arco: clamp(236px, 65vw, 340px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "vitrina"
+      "firma"
+      "texto";
+    justify-items: center;
+    align-content: start;
+    padding: 2px 20px 0;
+  }
+
+  .vitrina {
+    align-self: auto;
+    aspect-ratio: 254 / 330;
+  }
+
+  .vitrina__contorno { inset: 0; }
+  .vitrina__arco { inset: 4% 3.9% 0; }
+  .vitrina__marco { inset: 11px 11px 0; padding: 2.5px 2.5px 0; }
+
+  .vitrina__foto img {
+    object-position: 54% 50%;
+    transform: scale(1.12);
+    transform-origin: 54% 0%;
+  }
+
+  .sello {
+    left: -15.4%;
+    top: 6.7%;
+    width: 37.8%;
+  }
+
+  .taza-movil {
+    display: block;
+    position: absolute;
+    left: 72.8%;
+    top: 49.7%;
+    width: 48.8%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .firma {
+    margin-top: -36px;
+    padding-bottom: 0;
+    z-index: 2;
+  }
+
+  .firma > svg { display: none; }
+
+  .cinta-firma { margin-top: 0; }
+
+  .cinta-firma__punta {
+    top: 7px;
+    width: 34px;
+    height: 36px;
+  }
+
+  .cinta-firma__punta--izq { left: -20px; }
+  .cinta-firma__punta--der { right: -20px; }
+
+  .cinta-firma__pliegue {
+    top: 36px;
+    width: 15px;
+    height: 7px;
+  }
+
+  .cinta-firma__texto { height: 36px; }
+
+  .cinta-firma__etiqueta {
+    font-size: 10px;
+    letter-spacing: .2em;
+  }
+
+  .texto {
+    align-items: center;
+    width: 100%;
+    max-width: 520px;
+    padding: 19px 0 20px;
+    text-align: center;
+  }
+
+  .texto__maison { display: none; }
+
+  .texto__marca {
+    margin: 0;
+    font-size: clamp(52px, 15.4vw, 76px);
+    line-height: 1;
+  }
+
+  .texto__marca span { display: inline; }
+  .texto__marca .texto__marca-2 { padding-left: 0; }
+
+  .texto__lema {
+    margin-top: 14px;
+    font-size: clamp(22px, 6.15vw, 28px);
+    line-height: 1.2;
+  }
+
+  .texto__desc {
+    margin-top: 12px;
+    max-width: 310px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .acciones {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    max-width: 420px;
+    margin-top: 22px;
+  }
+
+  .boton {
+    height: 56px;
+    padding: 0 24px;
+  }
+
+  .enlace {
+    align-self: center;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .carta-cinta { height: 44px; }
+
+  .carta-cinta__grupo {
+    gap: 24px;
+    padding-right: 24px;
+    font-size: 18px;
+  }
+
+  .carta-cinta__grupo li { gap: 24px; }
+}
+
+@media (max-width: 1099px) and (prefers-reduced-motion: no-preference) {
+  .carta-cinta__pista { animation-duration: 36s; }
+}
