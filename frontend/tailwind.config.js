@@ -1,4 +1,46 @@
 /** @type {import('tailwindcss').Config} */
+
+// Diseño "Pistacho y oro": crema, verde pistacho, verde bosque, cobalto y oro.
+const verde = {
+  50: '#f3f7ee',
+  100: '#e3ecd8',
+  200: '#c9d9b5',
+  300: '#a9c28e',
+  400: '#7c9e5c',
+  500: '#5c7b43',
+  600: '#4a6334',
+  700: '#2a4520',
+  800: '#1f3517',
+  900: '#162711',
+};
+const pistacho = {
+  50: '#f6faf1',
+  100: '#eef5e6',
+  200: '#dbe9cb',
+  300: '#bfd8a5',
+  400: '#a3c486',
+  500: '#7c9e5c',
+};
+const cobalto = {
+  50: '#eef1fa',
+  100: '#dde3f4',
+  200: '#b9c5ea',
+  400: '#4a64b8',
+  500: '#22409a',
+  600: '#1b3380',
+  700: '#152866',
+};
+const oro = {
+  50: '#fbf6e7',
+  100: '#f6ecd2',
+  200: '#ead39a',
+  300: '#d8b45c',
+  400: '#c39b45',
+  500: '#b38a36',
+  600: '#8f6b21',
+  700: '#6f521a',
+};
+
 module.exports = {
   content: [
     "./public/index.html",
@@ -7,91 +49,50 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        serif: ['Fraunces', 'Georgia', 'serif'],
-        display: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Didot', 'Georgia', 'serif'],
+        display: ['"Playfair Display"', 'Didot', 'Georgia', 'serif'],
+        sans: ['Jost', 'Futura', '"Century Gothic"', 'system-ui', 'sans-serif'],
+        script: ['Parisienne', '"Snell Roundhand"', 'cursive'],
       },
       colors: {
-        // Espresso: fondos oscuros, texto principal
-        espresso: {
-          50: '#f6f1ec',
-          100: '#e9ded3',
-          200: '#d3bfad',
-          300: '#b39680',
-          400: '#8c6b55',
-          500: '#6b4e3b',
-          600: '#533b2c',
-          700: '#3d2b20',
-          800: '#2b1e16',
-          900: '#1c130d',
-        },
-        // Brass: acento cálido (caramelo / latón)
-        brass: {
-          50: '#fbf5ea',
-          100: '#f4e6cb',
-          200: '#e9cc98',
-          300: '#dcae64',
-          400: '#cf9442',
-          500: '#b87a2e',
-          600: '#9a6224',
-          700: '#7b4c1f',
-        },
-        // Superficies claras
-        cream: '#f7f1e8',
-        paper: '#fcfaf6',
-        foam: '#efe6d8',
-        // Estados en tonos terrosos
-        sage: { 100: '#e6ede2', 600: '#5b7a55', 700: '#48623f' },
-        terracotta: { 100: '#f5e2db', 600: '#b0523a', 700: '#8f3f2b' },
-        honey: { 100: '#f7ebcf', 600: '#a8761c', 700: '#86600f' },
-        slate: { 100: '#e3eaee', 600: '#51707f', 700: '#3f5967' },
-        // Tema moderno (sitio público): tostado oscuro + caramelo
-        roast: {
-          950: '#0e0906',
-          900: '#160f0a',
-          800: '#20160f',
-          700: '#2c1f16',
-          600: '#3d2c20',
-          500: '#55402f',
-        },
-        caramel: {
-          200: '#f7d9a8',
-          300: '#f2c27a',
-          400: '#e8a24a',
-          500: '#d9892f',
-          600: '#b86f22',
-        },
-        latte: '#f6eee2',
-        mocha: '#b9a592',
-        // Tema claro editorial (sitio público)
-        sheet: '#f4efe7',
-        ink: '#1a120d',
-        muted: '#6f6259',
-        line: '#e4dcd1',
-        clay: { 500: '#7a3f34', 600: '#5c2b26', 700: '#48201c' },
-        frame: '#5a3c2e',
-        // Compatibilidad con clases antiguas
-        primary: {
-          50: '#f6f1ec',
-          100: '#e9ded3',
-          200: '#d3bfad',
-          300: '#b39680',
-          400: '#8c6b55',
-          500: '#6b4e3b',
-          600: '#533b2c',
-          700: '#3d2b20',
-          800: '#2b1e16',
-          900: '#1c130d',
-        },
+        // ---- Tokens del diseño (usar estos en código nuevo) ----
+        verde,
+        pistacho,
+        cobalto,
+        oro,
+        crema: '#FBF6EA',
+        marfil: '#FFFBF1',
+
+        // ---- Alias de compatibilidad: nombres anteriores apuntando a la nueva paleta ----
+        espresso: verde,
+        primary: verde,
+        brass: oro,
+        caramel: oro,
+        clay: { 500: oro[600], 600: verde[700], 700: cobalto[500] },
+        cream: '#FBF6EA',
+        paper: '#FFFBF1',
+        foam: pistacho[100],
+        sheet: '#FBF6EA',
+        ink: verde[800],
+        muted: verde[600],
+        line: '#E7DDBF',
+        // Estados
+        sage: { 100: verde[100], 600: verde[500], 700: verde[700] },
+        terracotta: { 100: '#F6E1D9', 600: '#A4452F', 700: '#83341F' },
+        honey: { 100: oro[100], 600: oro[500], 700: oro[600] },
+        slate: { 100: cobalto[100], 600: cobalto[500], 700: cobalto[600] },
       },
       boxShadow: {
-        soft: '0 1px 2px rgba(43, 30, 22, 0.04), 0 4px 16px -4px rgba(43, 30, 22, 0.08)',
-        lift: '0 2px 4px rgba(43, 30, 22, 0.05), 0 12px 32px -8px rgba(43, 30, 22, 0.18)',
-        glow: '0 0 80px -16px rgba(232, 162, 74, 0.55)',
-        glass: '0 1px 0 rgba(255,255,255,0.06) inset, 0 20px 50px -20px rgba(0,0,0,0.6)',
+        soft: '0 1px 2px rgba(42, 69, 32, 0.05), 0 6px 18px -8px rgba(42, 69, 32, 0.14)',
+        lift: '0 2px 4px rgba(42, 69, 32, 0.06), 0 16px 36px -12px rgba(42, 69, 32, 0.22)',
+        oro: 'inset 0 0 0 4px currentColor, inset 0 0 0 5px #C9A64F',
       },
       borderRadius: {
         xl2: '1.25rem',
+        arco: '9999px 9999px 0 0',
+      },
+      letterSpacing: {
+        etiqueta: '0.2em',
       },
     },
   },

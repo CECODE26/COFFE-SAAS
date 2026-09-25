@@ -1,23 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Card } from './Card';
+import { LogoSello, Marca, ToldoFino } from './Decor';
 import { navFor, ROLE_LABELS } from '../lib/roles';
-import { Coffee, LogOut, Menu, X } from 'lucide-react';
+import { Coffee, LogOut, X } from 'lucide-react';
 
-export const Brand = ({ light = false }) => (
-  <div className="flex items-center gap-3">
-    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${light ? 'bg-brass-400 text-espresso-900' : 'bg-espresso-800 text-brass-300'}`}>
-      <Coffee className="h-5 w-5" strokeWidth={2.25} />
-    </div>
-    <div className="leading-tight">
-      <p className={`font-serif text-xl font-semibold ${light ? 'text-cream' : 'text-espresso-800'}`}>Coffe</p>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.25em] ${light ? 'text-brass-300' : 'text-brass-600'}`}>
-        Casa de café
-      </p>
-    </div>
-  </div>
-);
+// Compatibilidad: algunas pantallas importan <Brand />
+export const Brand = ({ light = false }) => <Marca light={light} />;
 
 const SidebarContent = ({ onNavigate }) => {
   const { user, logout } = useAuth();
@@ -32,23 +22,24 @@ const SidebarContent = ({ onNavigate }) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-6 pb-6 pt-7">
-        <Brand light />
+      <ToldoFino />
+      <div className="px-6 pb-6 pt-6">
+        <Marca light subtitulo="Maison de gestión" />
       </div>
 
       {user?.tenant_name && (
-        <div className="mx-3 mb-6 rounded-xl border border-espresso-700 px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-espresso-400">
+        <div className="mx-4 mb-6 rounded-2xl border border-oro-400/40 px-4 py-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-oro-300">
             {user.cafeteria_name ? 'Cafetería' : 'Distribuidor'}
           </p>
-          <p className="truncate text-sm text-cream">{user.cafeteria_name || user.tenant_name}</p>
+          <p className="truncate font-serif text-[15px] italic text-marfil">{user.cafeteria_name || user.tenant_name}</p>
         </div>
       )}
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3">
+      <nav className="flex-1 space-y-6 overflow-y-auto px-3" aria-label="Panel">
         {navFor(user?.role).map((section) => (
           <div key={section.title}>
-            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-espresso-400">{section.title}</p>
+            <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-verde-300">{section.title}</p>
             <div className="space-y-1">
               {section.links.map(({ path, label, icon: Icon }) => (
                 <NavLink
@@ -56,18 +47,18 @@ const SidebarContent = ({ onNavigate }) => {
                   to={path}
                   onClick={onNavigate}
                   className={({ isActive }) =>
-                    `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    `group relative flex items-center gap-3 rounded-full px-4 py-2.5 text-[13px] font-medium uppercase tracking-[0.14em] transition-colors ${
                       isActive
-                        ? 'bg-espresso-700 text-cream'
-                        : 'text-espresso-200 hover:bg-espresso-700/50 hover:text-cream'
+                        ? 'bg-marfil text-verde-700 shadow-[inset_0_0_0_1px_rgba(195,155,69,.7)]'
+                        : 'text-verde-100 hover:bg-white/10 hover:text-marfil'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon className={`h-[18px] w-[18px] ${isActive ? 'text-brass-300' : 'text-espresso-300 group-hover:text-brass-200'}`} />
+                      <Icon className={`h-[17px] w-[17px] ${isActive ? 'text-cobalto-500' : 'text-pistacho-300 group-hover:text-oro-300'}`} />
                       {label}
-                      {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brass-300" />}
+                      {isActive && <span className="ml-auto h-1.5 w-1.5 rotate-45 bg-oro-400" />}
                     </>
                   )}
                 </NavLink>
@@ -77,19 +68,20 @@ const SidebarContent = ({ onNavigate }) => {
         ))}
       </nav>
 
-      <div className="m-3 rounded-2xl bg-espresso-700/60 p-3">
+      <div className="m-3 rounded-2xl border border-white/10 bg-verde-800/60 p-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brass-200 font-serif font-semibold text-espresso-800">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-pistacho-300 font-serif italic text-verde-800 ring-1 ring-oro-400">
             {initials}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-sm font-medium text-cream">{user?.first_name || 'Usuario'}</p>
-            <p className="truncate text-xs text-espresso-300">{ROLE_LABELS[user?.role] || 'Staff'}</p>
+            <p className="truncate text-sm font-medium text-marfil">{user?.first_name || 'Usuario'}</p>
+            <p className="truncate text-xs text-verde-200">{ROLE_LABELS[user?.role] || 'Staff'}</p>
           </div>
           <button
             onClick={handleLogout}
             title="Cerrar sesión"
-            className="rounded-lg p-2 text-espresso-300 transition-colors hover:bg-espresso-600 hover:text-cream"
+            aria-label="Cerrar sesión"
+            className="rounded-full p-2 text-verde-200 transition-colors hover:bg-white/10 hover:text-marfil"
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -102,33 +94,49 @@ const SidebarContent = ({ onNavigate }) => {
 export const Layout = ({ children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
   return (
-    <div className="min-h-screen lg:pl-64">
+    <div className="min-h-screen lg:pl-72">
       {/* Sidebar escritorio */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-espresso-800 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r-2 border-oro-300 bg-verde-700 lg:block">
         <SidebarContent />
       </aside>
 
       {/* Barra superior móvil */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-espresso-100/70 bg-cream/85 px-4 py-3 backdrop-blur lg:hidden">
-        <Brand />
-        <button
-          onClick={() => setMenuOpen(true)}
-          className="rounded-full p-2 text-espresso-600 hover:bg-foam"
-          aria-label="Abrir menú"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+      <header className="sticky top-0 z-30 border-b border-oro-200 bg-crema/90 backdrop-blur lg:hidden">
+        <ToldoFino />
+        <div className="flex items-center justify-between px-4 py-2">
+          <span className="flex items-center gap-2">
+            <LogoSello size={40} />
+            <span className="font-serif text-lg italic text-verde-700">COFFE-SAAS</span>
+          </span>
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-verde-700 hover:bg-pistacho-100"
+            aria-label="Abrir menú"
+            aria-expanded={menuOpen}
+          >
+            <svg width="24" height="17" viewBox="0 0 26 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+              <path d="M1 2h24M1 9h24M7 16h18" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Drawer móvil */}
       {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-espresso-900/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <aside className="animate-fade-in absolute inset-y-0 left-0 w-72 bg-espresso-800 shadow-lift">
+          <div className="absolute inset-0 bg-verde-900/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
+          <aside className="animate-fade-in absolute inset-y-0 left-0 w-72 border-r-2 border-oro-300 bg-verde-700 shadow-lift">
             <button
               onClick={() => setMenuOpen(false)}
-              className="absolute right-3 top-7 rounded-full p-2 text-espresso-300 hover:text-cream"
+              className="absolute right-3 top-9 z-10 rounded-full p-2 text-verde-200 hover:text-marfil"
               aria-label="Cerrar menú"
             >
               <X className="h-5 w-5" />
@@ -146,48 +154,49 @@ export const Layout = ({ children }) => {
 export const PageHeader = ({ eyebrow, title, subtitle, actions }) => (
   <div className="animate-fade-in mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-      <h1 className="text-4xl font-semibold text-espresso-800 sm:text-[2.75rem] sm:leading-[1.1]">{title}</h1>
-      {subtitle && <p className="mt-2 max-w-xl text-espresso-400">{subtitle}</p>}
+      {eyebrow && <p className="mb-1 font-script text-[26px] leading-none text-oro-600">{eyebrow}</p>}
+      <h1 className="font-serif text-4xl italic font-medium leading-[1.05] text-verde-700 sm:text-[3rem]">{title}</h1>
+      {subtitle && <p className="mt-3 max-w-xl text-verde-600">{subtitle}</p>}
     </div>
-    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
   </div>
 );
 
 export const Loader = () => (
-  <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
-    <div className="h-10 w-10 animate-spin rounded-full border-2 border-foam border-t-brass-500" />
-    <p className="font-serif text-sm italic text-espresso-400">Preparando…</p>
+  <div className="flex h-[60vh] flex-col items-center justify-center gap-4" role="status">
+    <div className="h-10 w-10 animate-spin rounded-full border-2 border-pistacho-200 border-t-cobalto-500" />
+    <p className="font-script text-2xl text-oro-600">Preparando…</p>
   </div>
 );
 
 export const EmptyState = ({ icon: Icon = Coffee, title, description }) => (
   <Card className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-foam text-brass-600">
+    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-pistacho-100 text-cobalto-500 ring-1 ring-oro-300">
       <Icon className="h-6 w-6" />
     </div>
-    <p className="font-serif text-xl text-espresso-700">{title}</p>
-    {description && <p className="mt-1 text-sm text-espresso-400">{description}</p>}
+    <p className="font-serif text-2xl italic text-verde-700">{title}</p>
+    {description && <p className="mt-1 text-sm text-verde-600">{description}</p>}
   </Card>
 );
 
 // Selector segmentado para filtros
 export const Segmented = ({ options, value, onChange }) => (
-  <div className="inline-flex rounded-full border border-espresso-100 bg-paper p-1 shadow-soft">
+  <div className="inline-flex flex-wrap rounded-full border border-oro-300/70 bg-marfil p-1" role="tablist">
     {options.map((o) => (
       <button
         key={o.value}
+        role="tab"
+        aria-selected={value === o.value}
         onClick={() => onChange(o.value)}
-        className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-          value === o.value ? 'bg-espresso-800 text-cream shadow-soft' : 'text-espresso-400 hover:text-espresso-700'
+        className={`rounded-full px-4 py-1.5 text-[12px] font-medium uppercase tracking-[0.14em] transition-all ${
+          value === o.value ? 'bg-verde-700 text-marfil' : 'text-verde-600 hover:text-cobalto-500'
         }`}
       >
         {o.label}
         {o.count !== undefined && (
-          <span className={`ml-1.5 text-xs ${value === o.value ? 'text-brass-300' : 'text-espresso-300'}`}>{o.count}</span>
+          <span className={`ml-1.5 ${value === o.value ? 'text-oro-300' : 'text-oro-600'}`}>{o.count}</span>
         )}
       </button>
     ))}
   </div>
 );
-

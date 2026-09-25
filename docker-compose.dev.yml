@@ -73,9 +73,9 @@ services:
       WDS_SOCKET_PORT: 3002
       WDS_SOCKET_PATH: /ws
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      # Todo el frontend montado (src, public, tailwind.config.js...);
+      # node_modules queda dentro del contenedor.
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - web

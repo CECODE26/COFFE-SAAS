@@ -2,23 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Diseño "Pistacho y oro"
+ * Crema + verde pistacho + verde bosque + cobalto + oro.
+ * Títulos: Playfair Display (cursiva). Texto: Jost. Detalles manuscritos: Parisienne.
+ */
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-cream font-sans text-espresso-800;
-    background-image:
-      radial-gradient(circle at 100% 0%, rgba(207, 148, 66, 0.08), transparent 40%),
-      radial-gradient(circle at 0% 100%, rgba(107, 78, 59, 0.06), transparent 45%);
-    background-attachment: fixed;
+    @apply bg-crema font-sans text-verde-700;
+    /* Rayas verticales muy suaves, como el papel de la plantilla */
+    background-image: repeating-linear-gradient(90deg, rgba(191, 216, 165, 0.2) 0 1px, transparent 1px 48px);
   }
 
+  /* Sin color fijo: heredan del contenedor (así funcionan sobre fondos oscuros) */
   h1, h2, h3 {
-    @apply font-serif tracking-tight;
-    font-optical-sizing: auto;
+    @apply font-serif font-medium;
+    letter-spacing: -0.01em;
   }
 
   code {
@@ -26,141 +32,154 @@
   }
 
   ::selection {
-    @apply bg-brass-200 text-espresso-900;
+    @apply bg-pistacho-300 text-verde-800;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid #22409A;
+    outline-offset: 3px;
   }
 }
 
 @layer components {
-  .input {
-    @apply w-full rounded-xl border border-espresso-100 bg-paper px-4 py-3 text-espresso-800
-      placeholder:text-espresso-300 transition
-      focus:border-brass-400 focus:outline-none focus:ring-4 focus:ring-brass-100;
+  /* ---------- Tipografía ---------- */
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.22em] text-oro-600;
+  }
+  .manuscrita {
+    @apply font-script text-oro-600;
+  }
+  .titulo {
+    @apply font-serif italic font-medium text-verde-700;
+  }
+  .stat-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-verde-600;
   }
 
+  /* ---------- Formularios ---------- */
+  .input {
+    @apply w-full rounded-xl border border-oro-200/80 bg-marfil px-4 py-3 text-verde-800
+      placeholder:text-verde-600/50 transition
+      focus:border-cobalto-500 focus:outline-none focus:ring-4 focus:ring-cobalto-100;
+  }
   select.input {
     @apply appearance-none pr-10 disabled:cursor-not-allowed disabled:opacity-60;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238c6b55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%232A4520' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.9rem center;
   }
-
   .label {
-    @apply mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-espresso-400;
+    @apply mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-verde-600;
+  }
+  .field-error {
+    @apply text-terracotta-700;
+  }
+  .field-hint {
+    @apply text-verde-600/80;
+  }
+  .form-alert {
+    @apply border-terracotta-100 bg-terracotta-100/60 text-terracotta-700;
   }
 
-  .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-brass-600;
+  /* ---------- Botones (píldora con aro dorado interior) ---------- */
+  .btn-primary {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-verde-700 px-8 text-[13px] font-medium uppercase tracking-[0.2em] text-marfil transition-all duration-200;
+    box-shadow: inset 0 0 0 4px #2A4520, inset 0 0 0 5px #C9A64F;
+  }
+  .btn-primary:hover {
+    @apply bg-cobalto-500;
+    box-shadow: inset 0 0 0 4px #22409A, inset 0 0 0 5px #C9A64F;
+    transform: translateY(-1px);
+  }
+  .btn-cobalto {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-cobalto-500 px-8 text-[13px] font-medium uppercase tracking-[0.2em] text-marfil transition-all duration-200;
+    box-shadow: inset 0 0 0 4px #22409A, inset 0 0 0 5px #D8B45C;
+  }
+  .btn-cobalto:hover {
+    @apply bg-verde-700;
+    box-shadow: inset 0 0 0 4px #2A4520, inset 0 0 0 5px #D8B45C;
+    transform: translateY(-1px);
+  }
+  .btn-secondary {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full border border-oro-400/70 bg-marfil px-8 text-[13px] font-medium uppercase tracking-[0.2em] text-verde-700 transition-all duration-200 hover:border-cobalto-500 hover:text-cobalto-500;
+  }
+  .btn-light {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-marfil px-8 text-[13px] font-medium uppercase tracking-[0.2em] text-verde-700 transition-all duration-200 hover:bg-white;
+    box-shadow: inset 0 0 0 4px #FFFBF1, inset 0 0 0 5px #C9A64F;
+  }
+  .btn-dark {
+    @apply btn-primary;
+  }
+  /* Enlace subrayado en oro */
+  .enlace {
+    @apply inline-flex min-h-[44px] items-center text-[13px] font-medium uppercase tracking-[0.2em] text-verde-700 underline decoration-oro-400 decoration-1 underline-offset-[7px] transition-colors hover:text-cobalto-500;
   }
 
-  .stat-label {
-    @apply text-xs font-medium uppercase tracking-wider text-espresso-400;
+  /* ---------- Superficies ---------- */
+  .card {
+    @apply rounded-3xl border border-oro-200/70 bg-marfil;
+    box-shadow: 0 1px 2px rgba(42, 69, 32, 0.04), 0 12px 30px -20px rgba(42, 69, 32, 0.25);
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-0.5;
+  }
+  .card-hover:hover {
+    box-shadow: 0 2px 4px rgba(42, 69, 32, 0.05), 0 24px 44px -20px rgba(42, 69, 32, 0.32);
+  }
+  /* Marco dorado fino alrededor de un elemento */
+  .marco-oro {
+    @apply rounded-3xl p-[3px];
+    background: linear-gradient(135deg, #E6CB85, #B38A36 45%, #EAD39A 70%, #A67F2E);
+  }
+  /* Separador con rombo dorado */
+  .rombo {
+    @apply inline-block h-2 w-2 rotate-45 bg-oro-300;
   }
 }
 
-/* Tema claro editorial del sitio público */
-.frame {
-  @apply relative min-h-screen p-3 sm:p-5 lg:p-6;
-  background-color: #4a2e22;
-  /* Textura de granos de café con un velo cálido encima */
-  background-image:
-    linear-gradient(160deg, rgba(92, 56, 40, 0.45) 0%, rgba(60, 34, 24, 0.5) 60%, rgba(38, 20, 14, 0.7) 100%),
-    url('https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=2000&q=70');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-@media (max-width: 1024px) {
-  .frame {
-    background-attachment: scroll;
-  }
-}
-.sheet {
-  @apply relative overflow-clip rounded-[22px] bg-sheet text-ink sm:rounded-[30px];
-  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-.modern h1,
-.modern h2,
-.modern h3 {
-  @apply font-display tracking-[-0.02em];
-}
-.modern ::selection {
-  @apply bg-caramel-300 text-ink;
-}
-.card {
-  @apply rounded-3xl border border-line bg-white;
-  box-shadow: 0 1px 2px rgba(26, 18, 13, 0.04), 0 10px 30px -18px rgba(26, 18, 13, 0.18);
-}
-.card-hover {
-  @apply transition-all duration-300 hover:-translate-y-0.5;
-}
-.card-hover:hover {
-  box-shadow: 0 2px 4px rgba(26, 18, 13, 0.05), 0 24px 50px -20px rgba(26, 18, 13, 0.28);
-}
-.btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-full bg-clay-600 px-6 py-3.5 font-semibold text-white transition-all duration-300 hover:bg-clay-700;
-  box-shadow: 0 10px 24px -12px rgba(92, 43, 38, 0.7);
-}
-.btn-primary:hover {
-  transform: translateY(-1px);
-}
-.btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-full border border-ink/15 bg-transparent px-6 py-3.5 font-semibold text-ink transition-all hover:border-ink/40 hover:bg-white;
-}
-.btn-dark {
-  @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 font-semibold text-sheet transition-all hover:bg-clay-700;
-}
-.btn-light {
-  @apply inline-flex items-center justify-center gap-2 rounded-full bg-sheet px-6 py-3.5 font-semibold text-ink transition-all hover:bg-white;
-}
-.modern .input {
-  @apply border-line bg-white text-ink placeholder:text-muted/60 focus:border-clay-500 focus:ring-clay-500/15;
-}
-.modern .label {
-  @apply text-muted;
-}
-.modern .eyebrow {
-  @apply text-clay-500;
-}
-.modern .field-error {
-  @apply text-red-700;
-}
-.modern .field-hint {
-  @apply text-muted;
-}
-.modern .form-alert {
-  @apply border-red-200 bg-red-50 text-red-800;
-}
-.modern .legal h2 {
-  @apply font-display text-ink;
-}
-.modern .legal h3,
-.modern .legal strong {
-  @apply text-ink;
-}
-.modern .legal p,
-.modern .legal li {
-  @apply text-[#4d423a];
-}
-.modern .legal a {
-  @apply text-clay-600;
-}
-.modern .legal ul {
-  @apply marker:text-caramel-500;
+/* ---------- Sitio público ---------- */
+.modern {
+  @apply min-h-screen bg-crema text-verde-700;
 }
 
-/* Marquesina infinita */
+/* Documentos legales */
+.legal section + section {
+  margin-top: 3rem;
+}
+.legal h2 {
+  @apply mb-4 font-serif text-[1.7rem] italic font-medium text-verde-700;
+}
+.legal h3 {
+  @apply mb-2 mt-6 text-base font-semibold text-verde-700;
+}
+.legal p,
+.legal li {
+  @apply leading-relaxed text-verde-600;
+}
+.legal p + p {
+  margin-top: 0.9rem;
+}
+.legal ul {
+  @apply my-4 list-disc space-y-2 pl-5 marker:text-oro-400;
+}
+.legal ol {
+  @apply my-4 list-decimal space-y-2 pl-5 marker:text-oro-500;
+}
+.legal a {
+  @apply font-medium text-cobalto-500 underline decoration-oro-300 underline-offset-4 hover:decoration-cobalto-500;
+}
+.legal strong {
+  @apply font-semibold text-verde-700;
+}
+
+/* ---------- Marquesina infinita ---------- */
 .marquee {
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
 .marquee-track {
   display: flex;
   width: max-content;
-  animation: marquee var(--marquee-duration, 40s) linear infinite;
-}
-.marquee:hover .marquee-track {
-  animation-play-state: paused;
 }
 .marquee-group {
   display: flex;
@@ -171,72 +190,65 @@
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .marquee-track { animation: none; }
+
+/* ---------- Animaciones de la plantilla ---------- */
+.vapor {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+@keyframes vapor {
+  0% { opacity: 0; transform: translateY(10px) scaleY(0.85); }
+  35% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-18px) scaleY(1.12); }
+}
+@keyframes giro {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ondear {
+  0%, 100% { transform: scaleY(1) skewX(0deg); }
+  50% { transform: scaleY(1.08) skewX(0.5deg); }
+}
+.toldo-faldon {
+  transform-origin: 50% 0;
 }
 
-/* Documentos legales */
-.legal section + section {
-  margin-top: 3rem;
-}
-.legal h2 {
-  @apply mb-4 font-serif text-2xl font-medium text-espresso-800;
-}
-.legal h3 {
-  @apply mb-2 mt-6 text-base font-semibold text-espresso-800;
-}
-.legal p,
-.legal li {
-  @apply leading-relaxed text-espresso-600;
-}
-.legal p + p {
-  margin-top: 0.9rem;
-}
-.legal ul {
-  @apply my-4 list-disc space-y-2 pl-5 marker:text-brass-400;
-}
-.legal ol {
-  @apply my-4 list-decimal space-y-2 pl-5 marker:text-brass-500;
-}
-.legal a {
-  @apply font-medium text-brass-600 underline-offset-4 hover:underline;
-}
-.legal strong {
-  @apply font-semibold text-espresso-800;
+@media (prefers-reduced-motion: no-preference) {
+  .marquee-track { animation: marquee var(--marquee-duration, 40s) linear infinite; }
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+  .vapor { animation: vapor 3.6s ease-in-out infinite both; }
+  .vapor-1 { animation-delay: -0.3s; }
+  .vapor-2 { animation-delay: -1.2s; }
+  .vapor-3 { animation-delay: -2.4s; }
+  .giro-lento { animation: giro 28s linear infinite; }
+  .toldo-faldon { animation: ondear 5.5s ease-in-out infinite; }
 }
 
-/* Scrollbar */
+/* ---------- Scrollbar ---------- */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #d3bfad;
+  background: #BFD8A5;
   border-radius: 999px;
-  border: 3px solid #f7f1e8;
+  border: 3px solid #FBF6EA;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #b39680;
+  background: #7C9E5C;
 }
 
-/* Animations */
+/* ---------- Utilidades ---------- */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none; }
 }

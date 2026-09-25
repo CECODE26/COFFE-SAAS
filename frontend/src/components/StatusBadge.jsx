@@ -1,21 +1,22 @@
 import React from 'react';
 
+// Tonos en la paleta "Pistacho y oro"
 const TONES = {
-  sage: 'bg-sage-100 text-sage-700',
-  terracotta: 'bg-terracotta-100 text-terracotta-700',
-  honey: 'bg-honey-100 text-honey-700',
-  slate: 'bg-slate-100 text-slate-700',
-  brass: 'bg-brass-100 text-brass-700',
-  neutral: 'bg-foam text-espresso-500',
+  sage: 'bg-pistacho-200 text-verde-800 ring-1 ring-pistacho-400/60',
+  terracotta: 'bg-terracotta-100 text-terracotta-700 ring-1 ring-terracotta-600/20',
+  honey: 'bg-oro-100 text-oro-700 ring-1 ring-oro-300/60',
+  slate: 'bg-cobalto-50 text-cobalto-600 ring-1 ring-cobalto-200',
+  brass: 'bg-oro-50 text-oro-600 ring-1 ring-oro-200',
+  neutral: 'bg-verde-50 text-verde-600 ring-1 ring-verde-100',
 };
 
 const DOTS = {
-  sage: 'bg-sage-600',
+  sage: 'bg-verde-500',
   terracotta: 'bg-terracotta-600',
-  honey: 'bg-honey-600',
-  slate: 'bg-slate-600',
-  brass: 'bg-brass-500',
-  neutral: 'bg-espresso-300',
+  honey: 'bg-oro-400',
+  slate: 'bg-cobalto-500',
+  brass: 'bg-oro-500',
+  neutral: 'bg-verde-300',
 };
 
 // Estado del backend -> tono y etiqueta legible
@@ -39,9 +40,9 @@ const STATUS = {
 
 export const Badge = ({ tone = 'neutral', children, dot = true, className = '' }) => (
   <span
-    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${TONES[tone] || TONES.neutral} ${className}`}
+    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${TONES[tone] || TONES.neutral} ${className}`}
   >
-    {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOTS[tone] || DOTS.neutral}`} />}
+    {dot && <span className={`h-1.5 w-1.5 rotate-45 ${DOTS[tone] || DOTS.neutral}`} />}
     {children}
   </span>
 );
