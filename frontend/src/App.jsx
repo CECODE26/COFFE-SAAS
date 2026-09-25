@@ -23,6 +23,7 @@ import { ProteccionDatos } from './pages/legal/ProteccionDatos';
 import { Terminos } from './pages/legal/Terminos';
 import { Cookies } from './pages/legal/Cookies';
 import { Derechos } from './pages/legal/Derechos';
+import { Bienvenida, ClienteApp } from './pages/cliente';
 
 const ADMINS = ['super_admin', 'distribuidor_admin'];
 
@@ -73,6 +74,10 @@ function App() {
             <Route path="/legal/terminos" element={<Terminos />} />
             <Route path="/legal/cookies" element={<Cookies />} />
             <Route path="/legal/derechos" element={<Derechos />} />
+
+            {/* App del comensal (pedidos por QR): pública, sin PrivateRoute ni el Layout del panel */}
+            <Route path="/bienvenida" element={<Bienvenida />} />
+            <Route path="/mesa/*" element={<ClienteApp />} />
 
             {/* Protected Routes */}
             {routes.map(({ path, element, roles }) => (

@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.utils.deprecation import MiddlewareMixin
 from django.http import HttpResponseForbidden
 from .models import Tenant
@@ -19,7 +20,8 @@ class TenantMiddleware(MiddlewareMixin):
         if tenant_id:
             try:
                 request.tenant = Tenant.objects.get(id=tenant_id, is_active=True)
-            except Tenant.DoesNotExist:
+            except (Tenant.DoesNotExist, ValidationError, ValueError):
+                # Un id malformado ('abc', con NUL...) es un tenant que no existe: 403, no un 500
                 return HttpResponseForbidden('Tenant no encontrado o inactivo')
         else:
             request.tenant = None

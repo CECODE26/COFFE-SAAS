@@ -1,6 +1,8 @@
 import uuid
 from datetime import timedelta
 
+from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -82,3 +84,42 @@ class SolicitudDatos(models.Model):
         if self.estado in ('completada', 'rechazada') and not self.resuelta_at:
             self.resuelta_at = timezone.now()
         super().save(*args, **kwargs)
+
+
+class RegistroAuditoria(models.Model):
+    """Bitácora de acciones sensibles (cobros, cierres de mesa, QR regenerados...). Usar services.registrar()"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # SET_NULL: el registro se conserva aunque se elimine el tenant o el usuario
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='registros_auditoria'
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='registros_auditoria'
+    )
+    accion = models.CharField(_('Acción'), max_length=60, db_index=True)
+    objeto_tipo = models.CharField(_('Tipo de objeto'), max_length=60, blank=True)
+    objeto_id = models.CharField(_('Id del objeto'), max_length=64, blank=True)
+    # DjangoJSONEncoder: admite Decimal, UUID y fechas en el detalle
+    detalle = models.JSONField(_('Detalle'), default=dict, blank=True, encoder=DjangoJSONEncoder)
+    created_at = models.DateTimeField(_('Fecha'), auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = _('Registro de auditoría')
+        verbose_name_plural = _('Registros de auditoría')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'created_at']),
+            models.Index(fields=['objeto_tipo', 'objeto_id']),
+        ]
+
+    def __str__(self):
+        return f'{self.created_at:%Y-%m-%d %H:%M} · {self.accion} · {self.objeto_tipo} {self.objeto_id}'

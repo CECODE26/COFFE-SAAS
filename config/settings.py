@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from decouple import config
 
@@ -31,6 +32,7 @@ INSTALLED_APPS = [
     'apps.menu',
     'apps.facturacion',
     'apps.auditoria',
+    'apps.comensales',
 ]
 
 MIDDLEWARE = [
@@ -137,6 +139,37 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:3000,http://localhost:8000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
+
+# El cliente que escanea el QR se identifica con una cookie httpOnly: el navegador debe enviarla
+CORS_ALLOW_CREDENTIALS = True
+
+# Caché: Redis si hay REDIS_URL (límites anti-abuso y lock de limpieza compartidos entre procesos);
+# si no, memoria local. Los tests usan memoria local para no compartir claves con el servidor de desarrollo.
+REDIS_URL = config('REDIS_URL', default='')
+TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
+if REDIS_URL and not TESTING:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'KEY_PREFIX': 'coffe',
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'coffe-saas',
+        }
+    }
+
+# Comensales (pedidos por QR desde el celular del cliente)
+COMENSAL_INACTIVIDAD_MIN = config('COMENSAL_INACTIVIDAD_MIN', default=15, cast=int)  # cierra sesiones sin pedidos
+COMENSAL_COOKIE_HORAS = config('COMENSAL_COOKIE_HORAS', default=2, cast=int)
+COMENSAL_PAGADA_CIERRE_MIN = config('COMENSAL_PAGADA_CIERRE_MIN', default=10, cast=int)  # pagada → cerrada
+COMENSAL_UNION_EXPIRA_MIN = config('COMENSAL_UNION_EXPIRA_MIN', default=5, cast=int)  # solicitud de unión sin respuesta
+COMENSAL_COOKIE_NOMBRE = 'coffe_comensal'
+COMENSAL_COOKIE_SECURE = config('COMENSAL_COOKIE_SECURE', default=not DEBUG, cast=bool)
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'

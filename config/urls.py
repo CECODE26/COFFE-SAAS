@@ -17,6 +17,9 @@ urlpatterns = [
     path('api/v1/menu/', include('apps.menu.urls')),
     path('api/v1/facturacion/', include('apps.facturacion.urls')),
     path('api/v1/privacidad/', include('apps.auditoria.urls')),
+    # Pedidos por QR: cliente (cookie) y personal (JWT)
+    path('api/v1/cliente/', include('apps.comensales.urls_cliente')),
+    path('api/v1/comensales/', include('apps.comensales.urls_personal')),
 ]
 
 if settings.DEBUG:

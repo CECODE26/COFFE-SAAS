@@ -3,9 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.utils import timezone
-from django.db.models import Q, Count, Sum
+from django.db import transaction
+from django.db.models import Q, Count, Sum, ProtectedError
 
-from .models import Mesa, Reserva
+from .models import Mesa, Reserva, generar_token_qr
 from .serializers import (
     MesaListSerializer, MesaDetailSerializer, MesaCreateUpdateSerializer,
     MesaStatusChangeSerializer, MesaStatsSerializer,
@@ -13,6 +14,22 @@ from .serializers import (
     ReservaUpdateSerializer
 )
 from apps.accounts.permissions import IsTenantMember, IsCafeUser, IsDistribuidorAdmin
+from apps.auditoria.services import registrar
+from apps.comensales.models import SesionCliente
+
+
+class IsAdminMesas(BasePermission):
+    """
+    Administradores que pueden regenerar el QR de una mesa: cafe_admin, gerente,
+    distribuidor_admin y super_admin. El alcance (su local / su tenant) lo da
+    MesaViewSet.get_queryset (get_object() devuelve 404 fuera de él).
+    """
+    message = "Solo los administradores del local pueden regenerar el QR de una mesa."
+    ROLES = ['cafe_admin', 'gerente', 'distribuidor_admin', 'super_admin']
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.role in self.ROLES)
 
 
 class IsPersonalReservas(BasePermission):
@@ -56,6 +73,8 @@ class MesaViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsDistribuidorAdmin()]
         elif self.action in ['occupy', 'free', 'cleaning', 'change_status']:
             return [IsAuthenticated(), IsCafeUser()]
+        elif self.action == 'regenerar_qr':
+            return [IsAuthenticated(), IsAdminMesas()]
         return [IsAuthenticated(), IsTenantMember()]
 
     def get_queryset(self):
@@ -86,15 +105,55 @@ class MesaViewSet(viewsets.ModelViewSet):
         """Crear mesa"""
         serializer.save()
 
+    def destroy(self, request, *args, **kwargs):
+        """Borrar mesa. Una mesa con historial de pedidos por QR (sesiones o cuentas) no se borra: se desactiva."""
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {'error': 'La mesa tiene historial de pedidos por QR: desactívala en vez de borrarla.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def _cerrar_pagadas_al_ocupar(self, mesa):
+        """
+        (Mesa bloqueada) Ocupar a mano una mesa sin nadie conectado por QR equivale a "Mesa lista" + ocupar:
+        las sesiones QR ya cobradas se cierran. Si no, el QR seguiría en "Estamos preparando tu mesa" y, al
+        vencer esas sesiones, la mesa podría liberarse con gente sentada.
+        """
+        from apps.comensales.services import cerrar_sesiones_pagadas
+        if not SesionCliente.objects.filter(mesa=mesa, estado='activa').exists():
+            cerrar_sesiones_pagadas(mesa)
+
+    def _mesa_bloqueada(self, mesa):
+        """
+        Relee la mesa con SELECT FOR UPDATE (llamar dentro de transaction.atomic). Así nadie
+        entra por QR ni cobra mientras el personal cambia su estado: el cliente bloquea la
+        misma fila al entrar.
+        """
+        return Mesa.objects.select_for_update().get(pk=mesa.pk)
+
     def _bloqueo_por_pedido_abierto(self, mesa):
         """
-        Una mesa solo deja de estar ocupada cuando no tiene pedidos abiertos de tipo mesa
-        (abierto = no cancelado y no pagado). Si queda alguno, devuelve un 400 que el
-        frontend muestra tal cual; si no, None.
+        Una mesa solo deja de estar ocupada cuando no tiene comensales conectados por QR
+        (sesiones activas) ni pedidos abiertos de tipo mesa (abierto = no cancelado y no
+        pagado). Si queda algo, devuelve un 400 que el frontend muestra tal cual; si no, None.
         """
-        abierto = mesa.orders.filter(order_type='mesa', is_paid=False).exclude(
-            status='cancelada'
-        ).order_by('created_at').first()
+        conectadas = SesionCliente.objects.filter(mesa=mesa, estado='activa').count()
+        if conectadas:
+            return Response(
+                {
+                    'error': (
+                        f'La mesa {mesa.number} tiene {conectadas} persona(s) conectadas por QR: '
+                        f'cóbralas o ciérrala desde el detalle de la mesa.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Solo pedidos del propio local: uno de otro local que apunte a esta mesa no la bloquea
+        from apps.comensales.services import pedidos_de_mesa_abiertos
+        abierto = pedidos_de_mesa_abiertos(mesa).order_by('created_at').first()
         if abierto is None:
             return None
         # Un pedido entregado ya no se puede cancelar: solo queda cobrarlo
@@ -130,7 +189,10 @@ class MesaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        mesa.occupy(guest_count)
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            self._cerrar_pagadas_al_ocupar(mesa)
+            mesa.occupy(guest_count)
 
         return Response(
             {
@@ -143,20 +205,27 @@ class MesaViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def free(self, request, pk=None):
-        """Liberar mesa"""
+        """Liberar mesa. Sobre una mesa 'limpiando' es el "Mesa lista" tras el último cobro por QR."""
         mesa = self.get_object()
 
-        if mesa.status == 'disponible':
-            return Response(
-                {'error': 'Mesa ya está disponible'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
 
-        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
-        if bloqueo:
-            return bloqueo
+            if mesa.status == 'disponible':
+                return Response(
+                    {'error': 'Mesa ya está disponible'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        mesa.free()
+            bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+            if bloqueo:
+                return bloqueo
+
+            # Las sesiones QR ya cobradas (solo lectura, viendo su ticket) se cierran:
+            # si no, la mesa libre seguiría mostrando "Estamos preparando tu mesa" al escanear
+            from apps.comensales.services import cerrar_sesiones_pagadas
+            cerrar_sesiones_pagadas(mesa)
+            mesa.free()
 
         return Response(
             {
@@ -171,11 +240,13 @@ class MesaViewSet(viewsets.ModelViewSet):
     def cleaning(self, request, pk=None):
         """Marcar mesa como en limpieza"""
         mesa = self.get_object()
-        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
-        if bloqueo:
-            return bloqueo
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+            if bloqueo:
+                return bloqueo
 
-        mesa.cleaning()
+            mesa.cleaning()
 
         return Response(
             {
@@ -189,11 +260,13 @@ class MesaViewSet(viewsets.ModelViewSet):
     def maintenance(self, request, pk=None):
         """Marcar mesa como en mantenimiento"""
         mesa = self.get_object()
-        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
-        if bloqueo:
-            return bloqueo
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+            if bloqueo:
+                return bloqueo
 
-        mesa.maintenance()
+            mesa.maintenance()
 
         return Response(
             {
@@ -213,29 +286,67 @@ class MesaViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data['status']
         guest_count = serializer.validated_data.get('guest_count')
 
-        # Salir de 'ocupada' exige que no quede ningún pedido abierto en la mesa
-        if new_status != 'ocupada':
-            bloqueo = self._bloqueo_por_pedido_abierto(mesa)
-            if bloqueo:
-                return bloqueo
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
 
-        mesa.status = new_status
+            # Salir de 'ocupada' exige que no quede nadie conectado por QR ni pedidos abiertos
+            if new_status != 'ocupada':
+                bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+                if bloqueo:
+                    return bloqueo
 
-        if new_status == 'ocupada' and guest_count:
-            mesa.guest_count = guest_count
-            mesa.occupied_since = timezone.now()
-        elif new_status in ['disponible', 'limpiando']:
-            mesa.guest_count = 0
-            mesa.occupied_since = None
-            if new_status == 'disponible':
-                mesa.current_order = None
+            if new_status == 'ocupada':
+                self._cerrar_pagadas_al_ocupar(mesa)
 
-        mesa.save()
+            mesa.status = new_status
+
+            if new_status == 'ocupada' and guest_count:
+                mesa.guest_count = guest_count
+                mesa.occupied_since = timezone.now()
+            elif new_status in ['disponible', 'limpiando']:
+                mesa.guest_count = 0
+                mesa.occupied_since = None
+                if new_status == 'disponible':
+                    # Igual que free(): mesa libre sin nota ni sesiones QR cobradas pendientes de cierre
+                    from apps.comensales.services import cerrar_sesiones_pagadas
+                    cerrar_sesiones_pagadas(mesa)
+                    mesa.current_order = None
+                    mesa.nota_cierre = ''
+
+            mesa.save()
 
         return Response(
             {
                 'status': 'success',
                 'message': f'Estado actualizado a {mesa.get_status_display()}',
+                'mesa': MesaDetailSerializer(mesa).data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def regenerar_qr(self, request, pk=None):
+        """
+        Nuevo token para el QR de la mesa: el QR impreso anterior deja de servir.
+        Las personas ya sentadas no se ven afectadas (su sesión va por cookie, no por el QR).
+        """
+        mesa = self.get_object()
+
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            mesa.qr_code = generar_token_qr()
+            mesa.save(update_fields=['qr_code', 'updated_at'])
+            # El token viejo no se guarda en la bitácora: basta saber quién lo cambió y cuándo
+            registrar(
+                request.user, 'mesa.regenerar_qr', mesa,
+                numero=mesa.number, cafeteria=mesa.cafeteria.name
+            )
+
+        return Response(
+            {
+                'status': 'success',
+                'message': f'QR de la mesa {mesa.number} regenerado: imprime la tarjeta nueva.',
+                'qr_code': mesa.qr_code,
                 'mesa': MesaDetailSerializer(mesa).data
             },
             status=status.HTTP_200_OK

@@ -1,5 +1,6 @@
 import uuid
-from django.db import models
+from django.db import IntegrityError, models, transaction
+from django.db.models.functions import Length
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -77,6 +78,15 @@ class Order(models.Model):
         related_name='orders'
     )
 
+    # Comensal que hizo el pedido escaneando el QR (null = lo registró el personal)
+    sesion_cliente = models.ForeignKey(
+        'comensales.SesionCliente',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pedidos'
+    )
+
     # Customer info
     customer_name = models.CharField(_('Nombre Cliente'), max_length=200, blank=True)
     customer_phone = models.CharField(_('Teléfono Cliente'), max_length=20, blank=True)
@@ -131,22 +141,48 @@ class Order(models.Model):
     def __str__(self):
         return f"Pedido {self.order_number} - {self.get_status_display()}"
 
-    def save(self, *args, **kwargs):
-        if not self.order_number:
-            # Generar número de pedido
-            today = timezone.now().strftime('%Y%m%d')
-            count = Order.objects.filter(
-                cafeteria=self.cafeteria,
-                created_at__date=timezone.now().date()
-            ).count()
-            self.order_number = f"PED-{today}-{count + 1:04d}"
+    MAX_INTENTOS_NUMERO = 10
 
-        super().save(*args, **kwargs)
+    def save(self, *args, **kwargs):
+        if self.order_number:
+            return super().save(*args, **kwargs)
+
+        # Número PED-YYYYMMDD-NNNN único en todo el sistema. Dos pedidos simultáneos pueden calcular el mismo
+        # número: el índice único rechaza al segundo y se reintenta con el siguiente dentro de un savepoint.
+        prefijo = f"PED-{timezone.localdate():%Y%m%d}-"
+        numero = 0
+        for intento in range(self.MAX_INTENTOS_NUMERO):
+            numero = max(self._ultimo_numero_del_dia(prefijo), numero) + 1
+            self.order_number = f"{prefijo}{numero:04d}"
+            try:
+                with transaction.atomic():
+                    return super().save(*args, **kwargs)
+            except IntegrityError:
+                colision = Order.objects.filter(order_number=self.order_number).exclude(pk=self.pk).exists()
+                self.order_number = ''
+                if not colision or intento == self.MAX_INTENTOS_NUMERO - 1:
+                    raise
+
+    @staticmethod
+    def _ultimo_numero_del_dia(prefijo):
+        """Mayor correlativo usado con este prefijo (0 si aún no hay pedidos ese día)"""
+        ultimo = (
+            Order.objects.filter(order_number__startswith=prefijo)
+            .order_by(Length('order_number').desc(), '-order_number')
+            .values_list('order_number', flat=True)
+            .first()
+        )
+        if not ultimo:
+            return 0
+        try:
+            return int(ultimo[len(prefijo):])
+        except ValueError:
+            return 0
 
     def calculate_total(self):
-        """Recalcular total del pedido"""
+        """Recalcular total del pedido (los ítems cancelados no se cobran)"""
         self.subtotal = sum(
-            item.get_total_price() for item in self.items.all()
+            (item.get_total_price() for item in self.items.exclude(status='cancelada')), Decimal('0')
         )
         # 15% IVA Ecuador, redondeado a centavos para que total = subtotal + IVA - descuento
         self.tax = (Decimal(self.subtotal) * Decimal('0.15')).quantize(

@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -5,6 +6,11 @@ from django.utils import timezone
 from apps.tenants.models import Tenant
 from apps.cafeterias.models import Cafeteria
 from apps.accounts.models import User
+
+
+def generar_token_qr():
+    """Token aleatorio y no adivinable que va en el QR de la mesa (nunca el id ni el número)"""
+    return secrets.token_urlsafe(16)
 
 
 class Mesa(models.Model):
@@ -47,6 +53,7 @@ class Mesa(models.Model):
         max_length=255,
         unique=True,
         db_index=True,
+        default=generar_token_qr,
         help_text="Código único para identificar la mesa"
     )
 
@@ -80,6 +87,9 @@ class Mesa(models.Model):
         null=True,
         blank=True
     )
+
+    # Aviso para el personal tras un cobro parcial por QR (ej. "Queda $12.50 sin cobrar")
+    nota_cierre = models.TextField(_('Nota de cierre'), blank=True, default='')
 
     # Settings
     is_active = models.BooleanField(_('Activo'), default=True)
@@ -126,6 +136,7 @@ class Mesa(models.Model):
         self.guest_count = 0
         self.occupied_since = None
         self.current_order = None
+        self.nota_cierre = ''
         self.save()
 
     def cleaning(self):

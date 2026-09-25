@@ -1,17 +1,49 @@
+from decimal import Decimal, InvalidOperation
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q, Sum, Count, Avg
+from django.db.models.functions import Coalesce
 
 from .models import Order, OrderItem
 from .serializers import (
     OrderListSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderUpdateSerializer, OrderStateChangeSerializer, OrderPaymentSerializer,
-    OrderItemDetailSerializer, OrderStatsSerializer
+    OrderItemDetailSerializer, OrderStatsSerializer, OrderTableroSerializer
 )
 from apps.accounts.permissions import IsTenantMember, IsCafeUser
+
+# Estados en curso (columnas CAJA y COCINA del tablero)
+ESTADOS_ACTIVOS = ['pendiente', 'confirmada', 'preparando', 'lista']
+# Entregados de hoy que se muestran en la columna ENTREGADO
+MAX_ENTREGADOS_TABLERO = 30
+
+# "El pedido PED-... está <texto>" en los mensajes de error
+ESTADO_TEXTO = {
+    'pendiente': 'pendiente',
+    'confirmada': 'confirmado',
+    'preparando': 'en preparación',
+    'lista': 'listo',
+    'entregada': 'entregado',
+    'cancelada': 'cancelado',
+}
+
+
+def pedido_qr_cobrado(order, que_no):
+    """
+    400 si el pedido se hizo por QR y ya se cobró en la cuenta de la mesa (None si no): cancelarlo o
+    tocar sus ítems dejaría un pedido pagado y cancelado y un ticket que no cuadra con lo cobrado.
+    """
+    if not (order.is_paid and order.sesion_cliente_id):
+        return None
+    return Response(
+        {'error': f'El pedido {order.order_number} ya se cobró en la cuenta de la mesa: {que_no}.'},
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -45,8 +77,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         else:
             return Order.objects.none()
 
-        # Evitar N+1: mesa/cafetería (customer_info, cafeteria_name) e items con su producto
-        return queryset.select_related('mesa', 'cafeteria').prefetch_related('items__menu_item')
+        # Evitar N+1: mesa/cafetería (customer_info, mesa_numero, cafeteria_name), comensal QR
+        # (comensal_alias) e items con su producto
+        return queryset.select_related('mesa', 'cafeteria', 'sesion_cliente').prefetch_related(
+            'items__menu_item'
+        )
 
     def get_permissions(self):
         if self.action == 'create':
@@ -62,18 +97,53 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
         serializer.save()
 
+    # Flujo del tablero: pendiente (CAJA) --confirm--> confirmada (COCINA "En cola")
+    # --send_to_kitchen--> preparando --mark_ready--> lista --complete--> entregada (ENTREGADO).
+    # complete también vale desde preparando; cancel desde pendiente, confirmada o preparando.
+
+    def _pedido_bloqueado(self):
+        """
+        get_object() (alcance y permisos) y luego la fila con SELECT FOR UPDATE (llamar dentro de
+        transaction.atomic): si caja y cocina pulsan a la vez, el segundo ve el estado ya cambiado.
+        """
+        order = self.get_object()
+        return Order.objects.select_for_update().get(pk=order.pk)
+
+    def update(self, request, *args, **kwargs):
+        """PUT/PATCH con la fila bloqueada: un cobro simultáneo (is_paid) no se pisa con un save() viejo"""
+        partial = kwargs.pop('partial', False)
+        with transaction.atomic():
+            instance = self._pedido_bloqueado()
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def _transicion_no_aplica(self, order, regla):
+        """400 claro cuando la acción no corresponde al estado actual del pedido"""
+        return Response(
+            {
+                'error': (
+                    f'El pedido {order.order_number} está '
+                    f'{ESTADO_TEXTO.get(order.status, order.status)}: {regla}'
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
-        """Confirmar pedido"""
-        order = self.get_object()
+        """Confirmar pedido (en el tablero: "Enviar a cocina", de CAJA a COCINA)"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
 
-        if order.status != 'pendiente':
-            return Response(
-                {'error': 'Solo se pueden confirmar pedidos pendientes'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.status != 'pendiente':
+                return self._transicion_no_aplica(
+                    order, 'solo se envían a cocina (confirman) los pedidos pendientes.'
+                )
 
-        order.confirm()
+            order.confirm()
+
         return Response(
             {'status': 'success', 'message': 'Pedido confirmado'},
             status=status.HTTP_200_OK
@@ -81,21 +151,21 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def send_to_kitchen(self, request, pk=None):
-        """Enviar pedido a cocina"""
-        order = self.get_object()
+        """Empezar a preparar un pedido confirmado (en el tablero: "En preparación")"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
 
-        if order.status not in ['pendiente', 'confirmada']:
-            return Response(
-                {'error': 'Pedido no puede ser enviado a cocina'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.status != 'confirmada':
+                return self._transicion_no_aplica(
+                    order, 'solo pasa a preparación un pedido confirmado (en cola de cocina).'
+                )
 
-        order.status = 'preparando'
-        # Marcar todos los items como preparando
-        for item in order.items.all():
-            item.status = 'preparando'
-            item.save()
-        order.save()
+            order.status = 'preparando'
+            # Marcar los items como preparando (los cancelados siguen cancelados)
+            for item in order.items.exclude(status='cancelada'):
+                item.status = 'preparando'
+                item.save()
+            order.save()
 
         return Response(
             {'status': 'success', 'message': 'Pedido enviado a cocina'},
@@ -104,21 +174,21 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_ready(self, request, pk=None):
-        """Marcar pedido como listo"""
-        order = self.get_object()
+        """Marcar pedido como listo (en el tablero: "Preparado")"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
 
-        if order.status != 'preparando':
-            return Response(
-                {'error': 'Pedido no está siendo preparado'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.status != 'preparando':
+                return self._transicion_no_aplica(
+                    order, 'solo se marca como listo un pedido en preparación.'
+                )
 
-        order.status = 'lista'
-        # Marcar todos los items como listos
-        for item in order.items.all():
-            item.status = 'lista'
-            item.save()
-        order.save()
+            order.status = 'lista'
+            # Marcar los items como listos (los cancelados siguen cancelados)
+            for item in order.items.exclude(status='cancelada'):
+                item.status = 'lista'
+                item.save()
+            order.save()
 
         return Response(
             {'status': 'success', 'message': 'Pedido listo para servir'},
@@ -127,16 +197,17 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
-        """Completar/Entregar pedido"""
-        order = self.get_object()
+        """Completar/Entregar pedido (en el tablero: "Entregado")"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
 
-        if order.status not in ['lista', 'preparando']:
-            return Response(
-                {'error': 'Pedido no puede ser completado'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.status not in ['lista', 'preparando']:
+                return self._transicion_no_aplica(
+                    order, 'solo se entrega un pedido listo o en preparación.'
+                )
 
-        order.complete()
+            order.complete()
+
         return Response(
             {'status': 'success', 'message': 'Pedido entregado'},
             status=status.HTTP_200_OK
@@ -144,16 +215,21 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancelar pedido"""
-        order = self.get_object()
+        """Cancelar pedido (pendiente, confirmado o en preparación)"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
 
-        if order.status in ['entregada', 'cancelada']:
-            return Response(
-                {'error': 'No se puede cancelar un pedido completado'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.status not in ['pendiente', 'confirmada', 'preparando']:
+                return self._transicion_no_aplica(
+                    order, 'solo se cancela un pedido pendiente, confirmado o en preparación.'
+                )
 
-        order.cancel()
+            bloqueo = pedido_qr_cobrado(order, 'no se puede cancelar')
+            if bloqueo:
+                return bloqueo
+
+            order.cancel()
+
         return Response(
             {'status': 'success', 'message': 'Pedido cancelado'},
             status=status.HTTP_200_OK
@@ -161,8 +237,15 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
-        """Marcar pedido como pagado"""
+        """Marcar pedido como pagado (los pedidos por QR se cobran desde la cuenta de la mesa)"""
         order = self.get_object()
+
+        if order.sesion_cliente_id:
+            return Response(
+                {'error': 'Este pedido se hizo por QR: cóbralo desde la cuenta de la mesa (Mesas → detalle).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = OrderPaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -176,18 +259,28 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def apply_discount(self, request, pk=None):
-        """Aplicar descuento al pedido"""
-        order = self.get_object()
+        """Aplicar descuento al pedido (no a uno ya cobrado)"""
         discount = request.data.get('discount')
-
-        if not discount or float(discount) < 0:
+        try:
+            valor = Decimal(str(discount))
+            invalido = not discount or not valor.is_finite() or valor < 0 or valor >= Decimal('1e10')
+        except (InvalidOperation, ValueError):
+            invalido = True
+        if invalido:
             return Response(
                 {'error': 'Descuento inválido'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        order.discount = discount
-        order.calculate_total()
+        with transaction.atomic():
+            order = self._pedido_bloqueado()
+            if order.is_paid:
+                return Response(
+                    {'error': f'El pedido {order.order_number} ya fue cobrado: no se puede cambiar el descuento.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            order.discount = valor
+            order.calculate_total()
 
         return Response(
             {
@@ -211,6 +304,31 @@ class OrderViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
 
         serializer = OrderListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def tablero(self, request):
+        """
+        Tablero CAJA / COCINA / ENTREGADO: todos los pedidos en curso (pendiente, confirmada,
+        preparando, lista) y los 30 entregados más recientes de hoy. Sin paginar y del más
+        antiguo al más nuevo (created_at ascendente). Mismo alcance que el listado.
+        """
+        queryset = self.get_queryset()
+
+        # "De hoy" según la hora de entrega (updated_at si un pedido antiguo no la tiene)
+        entregados_hoy = list(
+            queryset.filter(status='entregada')
+            .annotate(entregado_en=Coalesce('completed_at', 'updated_at'))
+            .filter(entregado_en__date=timezone.localdate())
+            .order_by('-entregado_en', '-id')
+            .values_list('pk', flat=True)[:MAX_ENTREGADOS_TABLERO]
+        )
+
+        queryset = queryset.filter(
+            Q(status__in=ESTADOS_ACTIVOS) | Q(pk__in=entregados_hoy)
+        ).order_by('created_at', 'id')
+
+        serializer = OrderTableroSerializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
@@ -246,7 +364,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def today(self, request):
         """Pedidos de hoy"""
-        today = timezone.now().date()
+        # Fecha local (America/Guayaquil): con la fecha UTC, desde las 19:00 "hoy" ya era mañana
+        today = timezone.localdate()
         queryset = self.get_queryset().filter(created_at__date=today)
 
         page = self.paginate_queryset(queryset)
@@ -313,20 +432,50 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    def _pedido_bloqueado(self, item):
+        """Pedido del ítem con SELECT FOR UPDATE (llamar dentro de transaction.atomic)"""
+        return Order.objects.select_for_update().get(pk=item.order_id)
+
+    def update(self, request, *args, **kwargs):
+        """Editar un ítem: no en un pedido por QR ya cobrado (el ticket dejaría de cuadrar)"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado(self.get_object())
+            bloqueo = pedido_qr_cobrado(order, 'no se pueden cambiar sus productos')
+            if bloqueo:
+                return bloqueo
+            return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Borrar un ítem: no en un pedido por QR ya cobrado"""
+        with transaction.atomic():
+            order = self._pedido_bloqueado(self.get_object())
+            bloqueo = pedido_qr_cobrado(order, 'no se pueden quitar sus productos')
+            if bloqueo:
+                return bloqueo
+            return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancelar item"""
+        """Cancelar item (su precio deja de contar en el total del pedido)"""
         item = self.get_object()
 
-        if item.status in ['entregada', 'cancelada']:
-            return Response(
-                {'error': 'Item no puede ser cancelado'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        with transaction.atomic():
+            order = self._pedido_bloqueado(item)
+            item = OrderItem.objects.select_for_update().get(pk=item.pk)
 
-        item.status = 'cancelada'
-        item.save()
-        item.order.calculate_total()
+            if item.status in ['entregada', 'cancelada']:
+                return Response(
+                    {'error': 'Item no puede ser cancelado'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            bloqueo = pedido_qr_cobrado(order, 'no se pueden cancelar sus productos')
+            if bloqueo:
+                return bloqueo
+
+            item.status = 'cancelada'
+            item.save()
+            order.calculate_total()
 
         return Response(
             {'status': 'success', 'message': 'Item cancelado'},

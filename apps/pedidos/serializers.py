@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
 from apps.menu.models import MenuItem
+from apps.mesas.models import Mesa
 
 
 class OrderItemDetailSerializer(serializers.ModelSerializer):
@@ -39,7 +40,34 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         return value
 
 
-class OrderListSerializer(serializers.ModelSerializer):
+class OrigenPedidoMixin(serializers.Serializer):
+    """
+    Campos comunes para distinguir los pedidos hechos por QR de los del personal y ubicar la mesa.
+    Usa select_related('mesa', 'sesion_cliente') de la vista para no hacer consultas extra.
+    """
+    origen = serializers.SerializerMethodField()
+    comensal_alias = serializers.SerializerMethodField()
+    mesa_numero = serializers.SerializerMethodField()
+    mesa_zona = serializers.SerializerMethodField()
+
+    CAMPOS_ORIGEN = ['origen', 'comensal_alias', 'mesa_numero', 'mesa_zona']
+
+    def get_origen(self, obj):
+        """'qr' si lo pidió un comensal desde su celular; 'personal' si lo registró el personal"""
+        return 'qr' if obj.sesion_cliente_id else 'personal'
+
+    def get_comensal_alias(self, obj):
+        return obj.sesion_cliente.alias if obj.sesion_cliente_id else None
+
+    def get_mesa_numero(self, obj):
+        return obj.mesa.number if obj.mesa_id else None
+
+    def get_mesa_zona(self, obj):
+        # La "zona" de la mesa es su ubicación (Terraza, Barra...)
+        return obj.mesa.location if obj.mesa_id else None
+
+
+class OrderListSerializer(OrigenPedidoMixin, serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
@@ -51,7 +79,7 @@ class OrderListSerializer(serializers.ModelSerializer):
             'id', 'order_number', 'status', 'order_type', 'total',
             'is_paid', 'customer_info', 'items_count', 'items', 'created_at',
             'tenant', 'cafeteria', 'cafeteria_name'
-        ]
+        ] + OrigenPedidoMixin.CAMPOS_ORIGEN
         read_only_fields = ['id', 'order_number', 'created_at']
 
     def get_customer_info(self, obj):
@@ -71,7 +99,33 @@ class OrderListSerializer(serializers.ModelSerializer):
         ]
 
 
-class OrderDetailSerializer(serializers.ModelSerializer):
+class OrderTableroSerializer(OrderListSerializer):
+    """
+    Pedido en el tablero CAJA / COCINA / ENTREGADO: lo de la lista más las notas y las horas
+    de cada paso. Los items llevan su nota ("sin azúcar") para cocina.
+    """
+
+    class Meta(OrderListSerializer.Meta):
+        fields = OrderListSerializer.Meta.fields + [
+            'customer_name', 'mesa', 'notes', 'kitchen_notes',
+            'confirmed_at', 'completed_at', 'updated_at'
+        ]
+
+    def get_items(self, obj):
+        """[{id, menu_item_name, quantity, notes, status}] (usa prefetch 'items__menu_item')"""
+        return [
+            {
+                'id': str(item.id),
+                'menu_item_name': item.menu_item.name,
+                'quantity': item.quantity,
+                'notes': item.notes,
+                'status': item.status,
+            }
+            for item in obj.items.all()
+        ]
+
+
+class OrderDetailSerializer(OrigenPedidoMixin, serializers.ModelSerializer):
     items = OrderItemDetailSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     cafeteria_name = serializers.CharField(source='cafeteria.name', read_only=True)
@@ -88,7 +142,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             'notes', 'kitchen_notes',
             'created_by', 'created_by_name', 'items',
             'created_at', 'confirmed_at', 'completed_at', 'updated_at'
-        ]
+        ] + OrigenPedidoMixin.CAMPOS_ORIGEN
         read_only_fields = [
             'id', 'order_number', 'subtotal', 'tax', 'total',
             'created_at', 'confirmed_at', 'completed_at', 'updated_at'
@@ -113,6 +167,24 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             'order_type', 'mesa', 'customer_name', 'customer_phone',
             'customer_address', 'notes', 'kitchen_notes', 'items'
         ]
+        extra_kwargs = {
+            'mesa': {'error_messages': {'does_not_exist': 'Esa mesa no es de tu local.'}},
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Solo mesas del local del usuario y productos de su distribuidor: si no, un pedido ajeno quedaría
+        # colgado de una mesa de otro local y la bloquearía (sin que su personal pudiera verlo ni cancelarlo)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return
+        cafeteria_id = user.cafeteria_id
+        tenant_id = user.cafeteria.tenant_id if cafeteria_id else user.tenant_id
+        self.fields['mesa'].queryset = Mesa.objects.filter(cafeteria_id=cafeteria_id)
+        producto = self.fields['items'].child.fields['menu_item']
+        producto.queryset = MenuItem.objects.filter(tenant_id=tenant_id)
+        producto.error_messages['does_not_exist'] = 'Ese producto no está en el menú de tu local.'
 
     def validate_mesa(self, value):
         if self.initial_data.get('order_type') == 'mesa' and not value:
@@ -127,10 +199,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         request = self.context.get('request')
+        cafeteria = request.user.cafeteria
 
+        # El distribuidor sale del local del usuario, no del header X-Tenant-ID (lo controla el cliente)
         order = Order.objects.create(
-            tenant=request.tenant,
-            cafeteria=request.user.cafeteria,
+            tenant_id=cafeteria.tenant_id,
+            cafeteria=cafeteria,
             created_by=request.user,
             **validated_data
         )
@@ -150,6 +224,13 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
 
 class OrderUpdateSerializer(serializers.ModelSerializer):
+    """
+    Edición de datos del pedido. El estado solo cambia con las acciones del tablero (confirm,
+    send_to_kitchen, mark_ready, complete, cancel), que validan cada paso. Lo ya cobrado no se toca:
+    el descuento de un pedido pagado y el método de pago de un pedido por QR (se registra al cobrar la
+    cuenta de la mesa) quedan fijos. La vista lo ejecuta con la fila bloqueada (select_for_update).
+    """
+
     class Meta:
         model = Order
         fields = [
@@ -157,6 +238,34 @@ class OrderUpdateSerializer(serializers.ModelSerializer):
             'customer_address', 'notes', 'kitchen_notes',
             'discount', 'payment_method'
         ]
+
+    def validate_discount(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError('El descuento no puede ser negativo.')
+        return value
+
+    def validate(self, attrs):
+        pedido = self.instance
+        if pedido is None:
+            return attrs
+        if 'status' in attrs and attrs['status'] != pedido.status:
+            raise serializers.ValidationError({
+                'status': 'El estado del pedido se cambia desde el tablero (enviar a cocina, preparar, '
+                          'entregar o cancelar).'
+            })
+        if pedido.is_paid and 'discount' in attrs and attrs['discount'] != pedido.discount:
+            raise serializers.ValidationError({
+                'discount': f'El pedido {pedido.order_number} ya fue cobrado: no se puede cambiar el descuento.'
+            })
+        if (
+            pedido.sesion_cliente_id and 'payment_method' in attrs
+            and attrs['payment_method'] != pedido.payment_method
+        ):
+            raise serializers.ValidationError({
+                'payment_method': 'Este pedido se hizo por QR: el método de pago se registra al cobrar la cuenta '
+                                  'de la mesa (Mesas → detalle).'
+            })
+        return attrs
 
     def update(self, instance, validated_data):
         # Recalcular total si hay descuento

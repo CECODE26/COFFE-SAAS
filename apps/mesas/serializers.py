@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Mesa, Reserva
+from .models import Mesa, Reserva, generar_token_qr
 from datetime import datetime, timedelta
 from django.utils import timezone
 
@@ -14,9 +14,11 @@ class MesaListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'number', 'slug', 'capacity', 'min_capacity', 'status', 'guest_count',
             'location', 'occupied_time', 'current_order_number', 'is_active',
-            'cafeteria', 'cafeteria_name'
+            'cafeteria', 'cafeteria_name',
+            # Token del QR (para imprimir la tarjeta) y aviso tras un cobro parcial por QR
+            'qr_code', 'nota_cierre'
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'qr_code', 'nota_cierre']
 
     def get_occupied_time(self, obj):
         """Tiempo ocupado en minutos"""
@@ -82,7 +84,6 @@ class MesaCreateUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        import uuid
         from django.utils.text import slugify
 
         request = self.context.get('request')
@@ -90,8 +91,8 @@ class MesaCreateUpdateSerializer(serializers.ModelSerializer):
         # Generar slug
         validated_data['slug'] = slugify(f"mesa-{validated_data['number']}")
 
-        # Generar QR único
-        validated_data['qr_code'] = str(uuid.uuid4())
+        # Token del QR: aleatorio y no adivinable (nunca el id ni el número de la mesa)
+        validated_data['qr_code'] = generar_token_qr()
 
         # Asignar tenant y cafeteria
         validated_data['tenant'] = request.tenant

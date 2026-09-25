@@ -4,12 +4,15 @@ import { useAuth } from '../hooks/useAuth';
 import { Card } from './Card';
 import { LogoSello, Marca, ToldoFino } from './Decor';
 import { navFor, ROLE_LABELS } from '../lib/roles';
+import { AlertasMesero, rolConAlertas } from './AlertasMesero';
+import { useMedia } from './tablero/hooks';
 import { Coffee, LogOut, X } from 'lucide-react';
 
 // Compatibilidad: algunas pantallas importan <Brand />
 export const Brand = ({ light = false }) => <Marca light={light} />;
 
-const SidebarContent = ({ onNavigate }) => {
+// `campana`: avisos de mesas (solo en el sidebar de escritorio y para roles de cafetería)
+const SidebarContent = ({ onNavigate, campana = null }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -28,13 +31,15 @@ const SidebarContent = ({ onNavigate }) => {
       </div>
 
       {user?.tenant_name && (
-        <div className="mx-4 mb-6 rounded-2xl border border-oro-400/40 px-4 py-3">
+        <div className={`mx-4 rounded-2xl border border-oro-400/40 px-4 py-3 ${campana ? 'mb-2.5' : 'mb-6'}`}>
           <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-oro-300">
             {user.cafeteria_name ? 'Cafetería' : 'Distribuidor'}
           </p>
           <p className="truncate font-serif text-[15px] italic text-marfil">{user.cafeteria_name || user.tenant_name}</p>
         </div>
       )}
+
+      {campana && <div className="mx-4 mb-6">{campana}</div>}
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3" aria-label="Panel">
         {navFor(user?.role).map((section) => (
@@ -93,6 +98,11 @@ const SidebarContent = ({ onNavigate }) => {
 
 export const Layout = ({ children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useAuth();
+  // Una sola campana montada a la vez (evita avisos y sonidos duplicados):
+  // en escritorio va en el sidebar; en móvil, en la barra superior.
+  const escritorio = useMedia('(min-width: 1024px)');
+  const conAlertas = rolConAlertas(user?.role);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -105,7 +115,7 @@ export const Layout = ({ children }) => {
     <div className="min-h-screen lg:pl-72">
       {/* Sidebar escritorio */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r-2 border-oro-300 bg-verde-700 lg:block">
-        <SidebarContent />
+        <SidebarContent campana={conAlertas && escritorio ? <AlertasMesero variante="oscuro" /> : null} />
       </aside>
 
       {/* Barra superior móvil */}
@@ -116,16 +126,19 @@ export const Layout = ({ children }) => {
             <LogoSello size={40} />
             <span className="font-serif text-lg italic text-verde-700">COFFE-SAAS</span>
           </span>
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-verde-700 hover:bg-pistacho-100"
-            aria-label="Abrir menú"
-            aria-expanded={menuOpen}
-          >
-            <svg width="24" height="17" viewBox="0 0 26 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-              <path d="M1 2h24M1 9h24M7 16h18" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {conAlertas && !escritorio && <AlertasMesero variante="claro" />}
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-verde-700 hover:bg-pistacho-100"
+              aria-label="Abrir menú"
+              aria-expanded={menuOpen}
+            >
+              <svg width="24" height="17" viewBox="0 0 26 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M1 2h24M1 9h24M7 16h18" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 

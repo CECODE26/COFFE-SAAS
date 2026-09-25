@@ -16,9 +16,12 @@ Los datos se generan alrededor de la hora actual (America/Guayaquil) para que to
       En los locales que se enseñan (RECIENTES) los últimos pedidos del día son fijos, así siempre
       hay pedidos pendientes, confirmados, en preparación y listos.
     - Un pedido está "abierto" si no está cancelado ni pagado. Una mesa está 'ocupada' si y solo si
-      tiene exactamente un pedido de mesa abierto (en curso, o entregado esperando el cobro).
-      Todo lo demás que se entregó ya está cobrado. Las reservas de las próximas 2 horas dejan su
-      mesa como 'reservada'.
+      tiene exactamente un pedido de mesa abierto del personal (en curso, o entregado esperando el
+      cobro) o comensales conectados por QR (sesiones activas). Todo lo demás que se entregó ya está
+      cobrado. Las reservas de las próximas 2 horas dejan su mesa como 'reservada'.
+    - Pedidos por QR (ESCENARIO_QR): en el local principal, una mesa con el grupo ANA + BETO (ya
+      pidieron la cuenta) y CARLOS aparte (llamó al mesero), y otra mesa con una persona. Sus pedidos
+      llevan sesion_cliente y el alias como customer_name, y están repartidos por el tablero.
     - Historial: 3 jornadas completas antes de hoy (DIAS_HISTORIAL), al mismo ritmo.
     - Distribuidores suspendidos/inactivos y locales cerrados: solo sus 2 últimas jornadas antes del
       cierre (DIAS_HISTORIAL_CERRADO) y su personal queda inactivo (el admin del distribuidor no).
@@ -31,14 +34,16 @@ from itertools import product
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.accounts.models import User
-from apps.auditoria.models import SolicitudDatos
+from apps.auditoria.models import RegistroAuditoria, SolicitudDatos
 from apps.cafeterias.models import Cafeteria
+from apps.comensales.models import AlertaMesero, SesionCliente, SolicitudPago, SolicitudUnion
 from apps.menu.models import Category, MenuItem
-from apps.mesas.models import Mesa, Reserva
+from apps.mesas.models import Mesa, Reserva, generar_token_qr
 from apps.pedidos.models import Order, OrderItem
 from apps.tenants.models import Tenant
 
@@ -71,6 +76,31 @@ RECIENTES = {
     'Café Centro Histórico': [(4, 'confirmada', 'takeaway'), (9, 'preparando', 'mesa')],
     'Café Cumbayá': [(6, 'preparando', 'mesa')],
 }
+
+# Comensales que piden desde su celular (QR) en el local principal. Tiempos en minutos antes de sembrar.
+#   sesiones: (alias, llegó hace, alias de la fundadora del grupo al que se unió o None, última actividad hace)
+#   pedidos:  (alias, hace cuánto lo pidió, estado); 'por_cobrar' = entregado y aún sin cobrar
+#   cuenta:   (quién la pidió, tipo, método preferido, hace cuánto) -> SolicitudPago pendiente + alerta 'cuenta'
+#   alertas:  (alias, tipo, hace cuánto) sin atender
+# Cada mesa se elige entre las que tienen sitio para todos y el personal no sienta a nadie más en ella
+# desde un rato antes de que llegue el primero (QR_MARGEN_MIN).
+ESCENARIO_QR = [
+    dict(
+        # ANA fundó el grupo y BETO se unió (ella lo aceptó); ya comieron y BETO pidió la cuenta grupal.
+        # CARLOS vino aparte: tiene un pedido en cocina y otro recién enviado, y llamó al mesero.
+        sesiones=[('ANA', 44, None, 7), ('BETO', 42, 'ANA', 5), ('CARLOS', 16, None, 1)],
+        pedidos=[('ANA', 40, 'por_cobrar'), ('BETO', 37, 'por_cobrar'),
+                 ('CARLOS', 12, 'preparando'), ('CARLOS', 2, 'pendiente')],
+        cuenta=('BETO', 'grupal', 'tarjeta', 5),
+        alertas=[('CARLOS', 'ayuda', 1)],
+    ),
+    dict(
+        # Una persona sola: un pedido listo para servir y otro en cola de cocina
+        sesiones=[('SOFÍA', 18, None, 4)],
+        pedidos=[('SOFÍA', 15, 'lista'), ('SOFÍA', 4, 'confirmada')],
+    ),
+]
+QR_MARGEN_MIN = 80  # un pedido del personal ocupa la mesa hasta 75 min (y se cobra antes de irse)
 
 MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre',
          'octubre', 'noviembre', 'diciembre']
@@ -307,7 +337,10 @@ class Command(BaseCommand):
         if options['reset']:
             self.stdout.write('Borrando datos existentes…')
             Mesa.objects.update(current_order=None)
-            for model in (SolicitudDatos, OrderItem, Order, Reserva, Mesa, MenuItem, Category, User, Cafeteria, Tenant):
+            # Lo de comensales QR va antes que las mesas (SesionCliente y SolicitudPago las protegen)
+            for model in (RegistroAuditoria, SolicitudDatos, AlertaMesero, SolicitudPago, SolicitudUnion,
+                          OrderItem, Order, SesionCliente, Reserva, Mesa, MenuItem, Category, User,
+                          Cafeteria, Tenant):
                 model.objects.all().delete()
         elif Tenant.objects.exists():
             self.stdout.write(self.style.WARNING('Ya hay datos. Usa --reset para regenerarlos.'))
@@ -346,6 +379,8 @@ class Command(BaseCommand):
             f'({Mesa.objects.filter(status="ocupada").count()} ocupadas), '
             f'{Order.objects.count()} pedidos ({Order.objects.filter(created_at__date=self.today).count()} de hoy, '
             f'{activos} pedidos activos ahora, {por_cobrar} entregados por cobrar), '
+            f'{SesionCliente.objects.filter(estado="activa").count()} comensales conectados por QR '
+            f'({Order.objects.filter(sesion_cliente__isnull=False).count()} pedidos por QR), '
             f'{Reserva.objects.count()} reservas, {SolicitudDatos.objects.count()} solicitudes LOPDP.'
         ))
         self.stdout.write('\nCuentas demo:')
@@ -444,12 +479,16 @@ class Command(BaseCommand):
                 # abiertos_mesa: mesa -> su pedido abierto (no cancelado y sin cobrar)
                 personal=defaultdict(list), abiertos_mesa={}, ultimo_en_mesa={}, reservadas=set(),
                 agenda=defaultdict(list),
+                # mesas_qr: mesa -> (mesa, escenario, {alias: sesión}); qr_desde: mesa -> desde cuándo
+                # el personal ya no sienta a nadie en ella (la esperan los comensales QR)
+                mesas_qr={}, qr_desde={},
             )
             if principal:
                 self.principal = ctx
             self._create_staff(ctx)
             self._create_mesas(ctx)
             self._create_orders(ctx)
+            self._completar_escenario_qr(ctx)
             self._create_reservas(ctx)
             self._ajustar_mesas(ctx)
 
@@ -527,7 +566,8 @@ class Command(BaseCommand):
             mesas.append(Mesa.objects.create(
                 tenant=tenant, cafeteria=cafe, number=num, slug=f'mesa-{num}',
                 capacity=capacity, min_capacity=CAPACIDAD_MINIMA[capacity],
-                qr_code=f'{cafe.id.hex[:8]}-M{num:02d}', status='disponible',
+                # Token aleatorio y no adivinable (nunca el id ni el número de la mesa)
+                qr_code=generar_token_qr(), status='disponible',
                 location=zonas[(num - 1) * len(zonas) // n],
             ))
         Mesa.objects.filter(cafeteria=cafe).update(created_at=ctx['alta'])
@@ -589,7 +629,85 @@ class Command(BaseCommand):
         if recientes:
             desde = min(t for t, _ in recientes)
             pedidos = [(t, fijo) for t, fijo in pedidos if t < desde] + sorted(recientes, key=lambda p: p[0])
+        if ctx['principal']:
+            # Los pedidos por QR se numeran junto con los del día, en orden de llegada
+            pedidos = sorted(pedidos + self._preparar_escenario_qr(ctx, medianoche), key=lambda p: p[0])
         self._registrar_dia(ctx, self.today, pedidos, libre_desde)
+
+    def _preparar_escenario_qr(self, ctx, medianoche):
+        """Elige las mesas de ESCENARIO_QR y crea sus sesiones (antes de repartir las mesas de hoy).
+
+        Devuelve los pedidos de esos comensales como [(instante, (estado, 'qr', sesión))] para que
+        _registrar_dia los cree junto con los del personal.
+        """
+        llegadas = [minutos for esc in ESCENARIO_QR for _, minutos, _, _ in esc['sesiones']]
+        if self.now - timedelta(minutes=max(llegadas)) < medianoche:
+            return []  # sembrado justo después de medianoche: todo debe ser de hoy
+        pedidos = []
+        for esc in ESCENARIO_QR:
+            candidatas = [m for m in ctx['mesas']
+                          if m.pk not in ctx['mesas_qr'] and m.capacity >= len(esc['sesiones'])]
+            if not candidatas:
+                continue
+            mesa = random.choice(candidatas)
+            sesiones = {}
+            for alias, llego, fundadora, actividad in esc['sesiones']:
+                sesiones[alias] = SesionCliente.objects.create(
+                    tenant=ctx['tenant'], mesa=mesa, alias=alias, estado='activa', qr_entrada=mesa.qr_code,
+                    grupo=sesiones[fundadora] if fundadora else None,
+                    fecha_inicio=self.now - timedelta(minutes=llego),
+                    ultima_actividad=self.now - timedelta(minutes=actividad),
+                )
+            ctx['mesas_qr'][mesa.pk] = (mesa, esc, sesiones)
+            primera = min(s.fecha_inicio for s in sesiones.values())
+            ctx['qr_desde'][mesa.pk] = primera - timedelta(minutes=QR_MARGEN_MIN)
+            pedidos += [(self.now - timedelta(minutes=hace), (estado, 'qr', sesiones[alias]))
+                        for alias, hace, estado in esc['pedidos']]
+        return pedidos
+
+    def _admite_personal(self, ctx, mesa, creado):
+        """¿Puede el personal sentar a alguien en la mesa a esa hora? (no si la esperan comensales QR)"""
+        return mesa.pk not in ctx['qr_desde'] or creado < ctx['qr_desde'][mesa.pk]
+
+    def _completar_escenario_qr(self, ctx):
+        """Uniones a grupos, cuentas pedidas y llamadas al mesero de los comensales QR (ya con sus pedidos)."""
+        metodos = dict(SolicitudPago.METODO_CHOICES)
+        for mesa, esc, sesiones in ctx['mesas_qr'].values():
+            # Quien se unió a un grupo lo pidió al entrar y la fundadora lo aceptó al momento
+            for sesion in sesiones.values():
+                if sesion.grupo_id:
+                    SolicitudUnion.objects.create(
+                        sesion=sesion, grupo=sesion.grupo, estado='aceptada', resuelta_por=sesion.grupo,
+                        created_at=sesion.fecha_inicio,
+                        resuelta_at=sesion.fecha_inicio + timedelta(seconds=random.randint(20, 90)),
+                    )
+
+            if esc.get('cuenta'):
+                alias, tipo, metodo, hace = esc['cuenta']
+                quien = sesiones[alias]
+                pedida = self.now - timedelta(minutes=hace)
+                cubiertas = list(quien.sesiones_de_grupo()) if tipo == 'grupal' else [quien]
+                totales = (Order.objects.filter(sesion_cliente__in=cubiertas, is_paid=False)
+                           .exclude(status='cancelada')
+                           .aggregate(subtotal=Sum('subtotal'), iva=Sum('tax'), total=Sum('total')))
+                solicitud = SolicitudPago.objects.create(
+                    tenant=ctx['tenant'], mesa=mesa, tipo=tipo, grupo_id=quien.grupo_key, solicitada_por=quien,
+                    subtotal=totales['subtotal'] or Decimal('0'), iva=totales['iva'] or Decimal('0'),
+                    total=totales['total'] or Decimal('0'), metodo_preferido=metodo, created_at=pedida,
+                )
+                solicitud.sesiones_cubiertas.set(cubiertas)
+                AlertaMesero.objects.create(
+                    tenant=ctx['tenant'], mesa=mesa, sesion=quien, tipo='cuenta', created_at=pedida,
+                    mensaje=f'{quien.alias} pide la cuenta ({tipo}) · {metodos[metodo]}',
+                )
+
+            for alias, tipo, hace in esc.get('alertas', []):
+                AlertaMesero.objects.create(
+                    tenant=ctx['tenant'], mesa=mesa, sesion=sesiones[alias], tipo=tipo,
+                    # Mismo texto que guarda services.llamar_mesero
+                    mensaje=f'{alias} llama al mesero' if tipo == 'ayuda' else '',
+                    created_at=self.now - timedelta(minutes=hace),
+                )
 
     def _estado_hoy(self, minutos):
         """Estado de un pedido de hoy según cuánto hace que entró."""
@@ -602,19 +720,26 @@ class Command(BaseCommand):
         return 'cancelada' if random.random() < 0.05 else 'entregada'
 
     def _registrar_dia(self, ctx, dia, pedidos, libre_desde):
-        """Crea los pedidos de un día. pedidos: [(instante, (estado, tipo) fijo o None si va al azar)]."""
+        """Crea los pedidos de un día. pedidos: [(instante, fijo)], donde fijo es (estado, tipo), None si
+        va al azar, o (estado, 'qr', sesión) para un pedido de un comensal QR (va a la mesa de su sesión)."""
         es_hoy = dia == self.today
         # ~5% de cancelados, sin que el azar deje un día con demasiados
         max_cancelados, cancelados = max(1, round(len(pedidos) * 0.05)), 0
         for nnn, (creado, fijo) in enumerate(pedidos, start=1):
-            estado, tipo = fijo or (None, random.choices(['mesa', 'takeaway', 'delivery'], weights=[60, 25, 15])[0])
-            mesa = None
-            if tipo == 'mesa':
-                # Una mesa solo recibe otro pedido cuando sus clientes ya se fueron
-                libres = [m for m in ctx['mesas'] if libre_desde[m.pk] <= creado]
+            sesion = None
+            if fijo and fijo[1] == 'qr':
+                estado, _, sesion = fijo
+                tipo, mesa = 'mesa', sesion.mesa
+            else:
+                estado, tipo = fijo or (None, random.choices(['mesa', 'takeaway', 'delivery'], weights=[60, 25, 15])[0])
+                mesa = None
+            if tipo == 'mesa' and not sesion:
+                # Una mesa solo recibe otro pedido cuando sus clientes ya se fueron (y no la esperan comensales QR)
+                libres = [m for m in ctx['mesas'] if libre_desde[m.pk] <= creado and self._admite_personal(ctx, m, creado)]
                 if not libres and fijo:
                     # Un pedido fijo va a la mesa que antes se desocupa entre las que no tienen cuenta abierta
-                    sin_cuenta = [m for m in ctx['mesas'] if m.pk not in ctx['abiertos_mesa']]
+                    sin_cuenta = [m for m in ctx['mesas']
+                                  if m.pk not in ctx['abiertos_mesa'] and self._admite_personal(ctx, m, creado)]
                     libres = [min(sin_cuenta, key=lambda m: libre_desde[m.pk])] if sin_cuenta else []
                 if libres:
                     mesa = random.choice(libres)
@@ -634,8 +759,9 @@ class Command(BaseCommand):
                 if cancelados > max_cancelados:
                     status = 'entregada'
             numero = f"PED-{ctx['codigo']}-{dia:%m%d}-{nnn:03d}"
-            order = self._crear_pedido(ctx, creado, status, tipo, mesa, numero, es_hoy, por_cobrar)
-            if mesa:
+            order = self._crear_pedido(ctx, creado, status, tipo, mesa, numero, es_hoy, por_cobrar, sesion)
+            if mesa and not sesion:
+                # Los pedidos QR no cuentan aquí: su mesa está ocupada por las sesiones, no por un pedido
                 ctx['ultimo_en_mesa'][mesa.pk] = order
                 if status != 'cancelada' and not order.is_paid:
                     # Pedido abierto: la mesa sigue ocupada (y no admite otro pedido) hasta que se cobre
@@ -652,7 +778,8 @@ class Command(BaseCommand):
                 return random.choice(candidatos)
         return None
 
-    def _crear_pedido(self, ctx, creado, status, tipo, mesa, numero, es_hoy, por_cobrar=False):
+    def _crear_pedido(self, ctx, creado, status, tipo, mesa, numero, es_hoy, por_cobrar=False, sesion=None):
+        """sesion: comensal QR que lo pidió desde su celular (lleva su alias y no lo registró el personal)."""
         tenant, cafe = ctx['tenant'], ctx['cafe']
 
         # Para llevar y delivery suelen cobrarse al pedir; en mesa se cobra al final. Todo lo entregado
@@ -696,10 +823,12 @@ class Command(BaseCommand):
                 if clave not in self.direcciones:
                     self.direcciones[clave] = random.choice(DIRECCIONES.get(cafe.city, DIRECCIONES['Quito']))
                 direccion = self.direcciones[clave]
+        if sesion:
+            nombre = sesion.alias
 
         order = Order.objects.create(
             tenant=tenant, cafeteria=cafe, order_type=tipo, mesa=mesa, status=status, order_number=numero,
-            created_by=self._responsable(ctx, tipo, creado),
+            created_by=None if sesion else self._responsable(ctx, tipo, creado), sesion_cliente=sesion,
             customer_name=nombre, customer_phone=telefono, customer_address=direccion,
             is_paid=pagado,
             payment_method=random.choice(['efectivo', 'tarjeta', 'tarjeta', 'transferencia']) if pagado else 'pendiente',
@@ -826,8 +955,8 @@ class Command(BaseCommand):
             estado = random.choices(['completada', 'cancelada'], weights=[90, 10])[0]
             self._reservar(ctx, self.today - timedelta(days=random.randint(1, 10)), estado)
 
-        # Hoy: solo en mesas que no están ocupadas ahora
-        ocupadas = set(ctx['abiertos_mesa'])
+        # Hoy: solo en mesas que no están ocupadas ahora (por un pedido abierto o por comensales QR)
+        ocupadas = set(ctx['abiertos_mesa']) | set(ctx['mesas_qr'])
         hoy = []
         abre, _ = self._jornada(cafe, self.today)
         hasta_atendidas = self.now - timedelta(minutes=150)
@@ -859,23 +988,36 @@ class Command(BaseCommand):
     def _ajustar_mesas(self, ctx):
         """Estado final de las mesas, recalculado desde la base de datos.
 
-        Una mesa está 'ocupada' si y solo si tiene exactamente un pedido de mesa abierto (ni cancelado
-        ni pagado): current_order es ese pedido y occupied_since su hora de entrada. Las demás mesas
-        quedan libres, reservadas (reserva en las próximas 2 horas) o limpiando, sin pedidos abiertos.
+        Una mesa está 'ocupada' si y solo si tiene exactamente un pedido de mesa abierto del personal
+        (ni cancelado ni pagado): current_order es ese pedido y occupied_since su hora de entrada; o si
+        tiene comensales conectados por QR (sesiones activas): sin current_order (cada comensal tiene sus
+        pedidos), occupied_since = llegada del primero y guest_count = nº de sesiones activas. Las demás
+        mesas quedan libres, reservadas (reserva en las próximas 2 horas) o limpiando, sin pedidos abiertos.
         """
+        cafe = ctx['cafe']
         abiertos = defaultdict(list)
-        for pedido in (Order.objects.filter(cafeteria=ctx['cafe'], order_type='mesa', is_paid=False)
+        for pedido in (Order.objects.filter(cafeteria=cafe, order_type='mesa', is_paid=False,
+                                            sesion_cliente__isnull=True)
                        .exclude(status='cancelada')):
             abiertos[pedido.mesa_id].append(pedido)
         if None in abiertos or any(len(pedidos) > 1 for pedidos in abiertos.values()):
-            raise CommandError(f"{ctx['cafe'].name}: hay mesas con más de un pedido abierto (o pedidos de mesa sin mesa)")
+            raise CommandError(f"{cafe.name}: hay mesas con más de un pedido abierto (o pedidos de mesa sin mesa)")
+        conectadas = defaultdict(list)
+        for sesion in SesionCliente.objects.filter(mesa__cafeteria=cafe, estado='activa'):
+            conectadas[sesion.mesa_id].append(sesion)
+        con_pedidos_qr = set(Order.objects.filter(cafeteria=cafe, sesion_cliente__isnull=False, is_paid=False)
+                             .exclude(status='cancelada').values_list('mesa_id', flat=True))
         if ctx['cierre']:
-            if abiertos:
-                raise CommandError(f"{ctx['cafe'].name}: un local cerrado no puede tener pedidos abiertos")
+            if abiertos or conectadas:
+                raise CommandError(f"{cafe.name}: un local cerrado no puede tener pedidos abiertos ni comensales QR")
             return  # local cerrado: todas disponibles
         ocupadas, reservadas = {mesa_id: pedidos[0] for mesa_id, pedidos in abiertos.items()}, ctx['reservadas']
         if set(ocupadas) != set(ctx['abiertos_mesa']) or reservadas & set(ocupadas):
-            raise CommandError(f"{ctx['cafe'].name}: el estado de las mesas no cuadra con sus pedidos")
+            raise CommandError(f"{cafe.name}: el estado de las mesas no cuadra con sus pedidos")
+        # Mesas QR: las del escenario, con sus pedidos abiertos, sin pedidos del personal ni reservas
+        if (set(conectadas) != set(ctx['mesas_qr']) or not con_pedidos_qr <= set(conectadas)
+                or set(conectadas) & (set(ocupadas) | reservadas)):
+            raise CommandError(f"{cafe.name}: las mesas con comensales QR no cuadran con sus sesiones y pedidos")
         for mesa in ctx['mesas']:
             if mesa.pk in ocupadas:
                 pedido = ocupadas[mesa.pk]
@@ -883,14 +1025,21 @@ class Command(BaseCommand):
                     status='ocupada', current_order=pedido, occupied_since=pedido.created_at,
                     guest_count=random.randint(mesa.min_capacity, mesa.capacity),
                 )
+            elif mesa.pk in conectadas:
+                sesiones = conectadas[mesa.pk]
+                Mesa.objects.filter(pk=mesa.pk).update(
+                    status='ocupada', current_order=None, nota_cierre='',
+                    occupied_since=min(s.fecha_inicio for s in sesiones), guest_count=len(sesiones),
+                )
             elif mesa.pk in reservadas:
                 Mesa.objects.filter(pk=mesa.pk).update(status='reservada')
 
         # En los locales grandes que están atendiendo, la mesa que se acaba de desocupar se está limpiando
-        abre, cierra = self._jornada(ctx['cafe'], self.today)
+        abre, cierra = self._jornada(cafe, self.today)
         atendiendo = ctx['principal'] or abre <= self.now <= cierra
         if len(ctx['mesas']) >= 10 and atendiendo:
-            libres = [m for m in ctx['mesas'] if m.pk not in ocupadas and m.pk not in reservadas]
+            libres = [m for m in ctx['mesas']
+                      if m.pk not in ocupadas and m.pk not in reservadas and m.pk not in conectadas]
             if libres:
                 antiguo = self.now - timedelta(days=365)
                 libres.sort(key=lambda m: getattr(ctx['ultimo_en_mesa'].get(m.pk), 'created_at', antiguo))
