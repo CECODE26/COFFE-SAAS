@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Avg
 
 from .models import Order, OrderItem
 from .serializers import (
@@ -20,7 +20,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsTenantMember]
     search_fields = ['order_number', 'customer_name', 'customer_phone']
     ordering_fields = ['created_at', 'total', 'status']
-    ordering = ['-created_at']
+    # '-id' desempata pedidos con el mismo created_at para que la paginación no repita ni omita
+    ordering = ['-created_at', '-id']
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -36,15 +37,16 @@ class OrderViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == 'super_admin':
-            return Order.objects.all()
+            queryset = Order.objects.all()
+        elif user.role == 'distribuidor_admin':
+            queryset = Order.objects.filter(tenant=user.tenant)
+        elif user.cafeteria:
+            queryset = Order.objects.filter(cafeteria=user.cafeteria)
+        else:
+            return Order.objects.none()
 
-        if user.role == 'distribuidor_admin':
-            return Order.objects.filter(tenant=user.tenant)
-
-        if user.cafeteria:
-            return Order.objects.filter(cafeteria=user.cafeteria)
-
-        return Order.objects.none()
+        # Evitar N+1: mesa/cafetería (customer_info, cafeteria_name) e items con su producto
+        return queryset.select_related('mesa', 'cafeteria').prefetch_related('items__menu_item')
 
     def get_permissions(self):
         if self.action == 'create':
@@ -230,7 +232,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             'pending_orders': queryset.filter(status__in=['pendiente', 'confirmada', 'preparando', 'lista']).count(),
             'completed_orders': queryset.filter(status='entregada').count(),
             'total_revenue': queryset.filter(is_paid=True).aggregate(Sum('total'))['total__sum'] or 0,
-            'average_order_value': queryset.aggregate(avg=Sum('total'))['avg'] or 0,
+            # Ticket promedio: media de total de los pedidos no cancelados (antes sumaba)
+            'average_order_value': queryset.exclude(status='cancelada').aggregate(avg=Avg('total'))['avg'] or 0,
             'cash_collected': queryset.filter(
                 is_paid=True,
                 payment_method='efectivo'

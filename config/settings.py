@@ -112,7 +112,8 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    # Paginación: ?page_size=N (por defecto 20, máximo 500)
+    'DEFAULT_PAGINATION_CLASS': 'config.pagination.StandardPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_RATES': {
         # Formulario público de derechos LOPDP

@@ -144,8 +144,9 @@ export const CountUp = ({ to, prefix = '', suffix = '', decimals = 0, duration =
   );
 };
 
-// Número que "late" en vivo: sube de a poco cada cierto tiempo
-export const LiveNumber = ({ start, step = [1, 4], every = 2200, prefix = '', suffix = '', decimals = 0, className = '' }) => {
+// Número que "late" en vivo: sube de a poco cada cierto tiempo.
+// `format` (opcional) reemplaza el formato por defecto, p. ej. money() para montos.
+export const LiveNumber = ({ start, step = [1, 4], every = 2200, prefix = '', suffix = '', decimals = 0, format, className = '' }) => {
   const [val, setVal] = useState(start);
   const reduce = useReducedMotion();
   useEffect(() => {
@@ -158,9 +159,15 @@ export const LiveNumber = ({ start, step = [1, 4], every = 2200, prefix = '', su
   }, [every, step, reduce]);
   return (
     <motion.span key={Math.round(val * 100)} className={`inline-block ${className}`} initial={{ y: -6, opacity: 0.4 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.35 }}>
-      {prefix}
-      {val.toLocaleString('es-EC', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
-      {suffix}
+      {format ? (
+        format(val)
+      ) : (
+        <>
+          {prefix}
+          {val.toLocaleString('es-EC', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
+          {suffix}
+        </>
+      )}
     </motion.span>
   );
 };

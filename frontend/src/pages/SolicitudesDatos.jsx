@@ -18,17 +18,37 @@ const ESTADOS = {
 
 const ABIERTAS = ['recibida', 'en_revision'];
 
-const daysLeft = (date) => Math.ceil((new Date(date) - new Date()) / 86400000);
+const DAY_MS = 86400000;
+
+// Medianoche local de una fecha (para contar días naturales)
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+// Plazo de una solicitud respecto a ahora:
+//  - vencida: días COMPLETOS desde la fecha límite (0 = venció hace menos de 24 h → "Vencida hoy")
+//  - en plazo: días naturales que faltan, por fecha local (0 = vence hoy)
+const plazoDe = (date) => {
+  const limite = new Date(date);
+  const ahora = new Date();
+  if (limite < ahora) return { vencida: true, dias: Math.floor((ahora - limite) / DAY_MS) };
+  return { vencida: false, dias: Math.round((startOfDay(limite) - startOfDay(ahora)) / DAY_MS) };
+};
 
 const Plazo = ({ s }) => {
   if (!ABIERTAS.includes(s.estado)) {
-    return <span className="text-xs text-verde-600">Resuelta {new Date(s.resuelta_at).toLocaleDateString('es-EC')}</span>;
+    return (
+      <span className="text-xs text-verde-600">
+        Resuelta{s.resuelta_at ? ` ${new Date(s.resuelta_at).toLocaleDateString('es-EC')}` : ''}
+      </span>
+    );
   }
-  const d = daysLeft(s.fecha_limite);
-  const tone = d < 0 ? 'terracotta' : d <= 3 ? 'honey' : 'neutral';
+  const { vencida, dias } = plazoDe(s.fecha_limite);
+  const tone = vencida ? 'terracotta' : dias <= 3 ? 'honey' : 'neutral';
+  const texto = vencida
+    ? (dias === 0 ? 'Vencida hoy' : `Vencida hace ${dias} d`)
+    : (dias === 0 ? 'Vence hoy' : `${dias} ${dias === 1 ? 'día' : 'días'}`);
   return (
     <Badge tone={tone} dot={false}>
-      <Clock className="h-3 w-3" aria-hidden="true" /> {d < 0 ? `Vencida hace ${-d} d` : d === 0 ? 'Vence hoy' : `${d} días`}
+      <Clock className="h-3 w-3" aria-hidden="true" /> {texto}
     </Badge>
   );
 };
@@ -55,7 +75,8 @@ export const SolicitudesDatos = () => {
     [items, filter]
   );
 
-  const vencidas = items.filter((s) => ABIERTAS.includes(s.estado) && daysLeft(s.fecha_limite) < 0).length;
+  // Incluye las que vencieron hace menos de 24 h ("Vencida hoy")
+  const vencidas = items.filter((s) => ABIERTAS.includes(s.estado) && plazoDe(s.fecha_limite).vencida).length;
 
   const open = (s) => {
     setSelected(s);

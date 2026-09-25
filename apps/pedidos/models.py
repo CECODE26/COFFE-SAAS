@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from apps.tenants.models import Tenant
 from apps.cafeterias.models import Cafeteria
 from apps.accounts.models import User
@@ -148,8 +148,11 @@ class Order(models.Model):
         self.subtotal = sum(
             item.get_total_price() for item in self.items.all()
         )
-        self.tax = self.subtotal * Decimal('0.12')  # 12% IVA Ecuador
-        self.total = self.subtotal + self.tax - self.discount
+        # 15% IVA Ecuador, redondeado a centavos para que total = subtotal + IVA - descuento
+        self.tax = (Decimal(self.subtotal) * Decimal('0.15')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        self.total = self.subtotal + self.tax - Decimal(str(self.discount or 0))
         self.save()
 
     def confirm(self):

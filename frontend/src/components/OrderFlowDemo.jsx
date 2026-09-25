@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { EASE } from './Motion';
 import { Badge } from './StatusBadge';
+import { money } from './Stats';
 import { Coffee, Croissant, Sandwich, Check } from 'lucide-react';
 
 const MENU = [
@@ -15,6 +16,11 @@ const COLS = [
   { key: 2, title: 'Listo', hint: 'Aviso para entregar', rombo: 'bg-verde-500' },
   { key: 3, title: 'Cobrado', hint: 'Caja registra el pago', rombo: 'bg-pistacho-400' },
 ];
+
+// Tope de pedidos en el tablero y de tarjetas visibles por columna.
+// Las columnas tienen altura fija: el tablero nunca cambia de tamaño y no empuja la página.
+const MAX_PEDIDOS = 8;
+const VISIBLES_POR_COLUMNA = 2;
 
 let uid = 1;
 const mk = (status = 0) => {
@@ -48,7 +54,7 @@ export const OrderFlowDemo = () => {
         // Limpia cobrados viejos y mete nuevos pendientes
         const cobrados = next.filter((o) => o.status === 3);
         if (cobrados.length > 2) next = next.filter((o) => o.id !== cobrados[0].id);
-        if (next.filter((o) => o.status === 0).length < 2) next = [...next, mk(0)];
+        if (next.filter((o) => o.status === 0).length < 2 && next.length < MAX_PEDIDOS) next = [...next, mk(0)];
         return next;
       });
     }, 1500);
@@ -59,8 +65,10 @@ export const OrderFlowDemo = () => {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {COLS.map((col) => {
         const list = orders.filter((o) => o.status === col.key);
+        const visibles = list.slice(0, VISIBLES_POR_COLUMNA);
+        const ocultos = list.length - visibles.length;
         return (
-          <div key={col.key} className="flex min-h-[260px] flex-col rounded-3xl border border-oro-200/80 bg-crema p-3">
+          <div key={col.key} className="flex h-[396px] flex-col overflow-hidden rounded-3xl border border-oro-200/80 bg-crema p-3">
             <div className="mb-3 flex items-start justify-between gap-2 border-b border-oro-200/80 px-1 pb-3">
               <div>
                 <p className="flex items-center gap-2 font-serif text-lg font-medium italic leading-tight text-verde-700">
@@ -78,17 +86,18 @@ export const OrderFlowDemo = () => {
                 {list.length}
               </motion.span>
             </div>
-            <div className="flex flex-col gap-2">
-              <AnimatePresence initial={false}>
-                {list.map((o) => (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              {/* popLayout: la tarjeta que sale deja de ocupar espacio al instante
+                  (sin layoutId entre columnas, que dejaba "fantasmas" invisibles ocupando sitio) */}
+              <AnimatePresence initial={false} mode="popLayout">
+                {visibles.map((o) => (
                   <motion.div
                     key={o.id}
-                    layoutId={`order-${o.id}`}
                     layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ layout: { duration: 0.55, ease: EASE }, duration: 0.3 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ layout: { duration: 0.4, ease: EASE }, duration: 0.3 }}
                     className={`rounded-2xl border border-oro-200/80 p-3 shadow-soft ${o.status === 3 ? 'bg-pistacho-50' : 'bg-marfil'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -110,7 +119,7 @@ export const OrderFlowDemo = () => {
                     </ul>
                     <div className="mt-2 flex items-center justify-between border-t border-oro-200/80 pt-1.5">
                       <span className="text-[11px] uppercase tracking-[0.14em] text-verde-600">Total</span>
-                      <span className="font-serif text-sm font-medium italic text-verde-700">${o.total.toFixed(2)}</span>
+                      <span className="font-serif text-sm font-medium italic text-verde-700">{money(o.total)}</span>
                     </div>
                     {o.status === 1 && (
                       <div className="mt-2 h-1 overflow-hidden rounded-full bg-pistacho-100" aria-hidden="true">
@@ -121,6 +130,10 @@ export const OrderFlowDemo = () => {
                 ))}
               </AnimatePresence>
             </div>
+            {/* Espacio reservado siempre: aparezca o no el aviso, la columna mide lo mismo */}
+            <p className="h-5 shrink-0 pt-1 text-center text-[11px] uppercase tracking-[0.14em] text-verde-600">
+              {ocultos > 0 ? `+${ocultos} más` : ''}
+            </p>
           </div>
         );
       })}

@@ -74,7 +74,7 @@ export const Cafeterias = () => {
                   key={c.id}
                   padded={false}
                   className={`animate-fade-in flex flex-col overflow-hidden hover:shadow-lift ${!c.is_active ? 'opacity-75' : ''}`}
-                  style={{ animationDelay: `${i * 40}ms` }}
+                  style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
                 >
                   <div className="flex-1 p-6">
                     {isSuper && (

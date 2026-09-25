@@ -55,10 +55,20 @@ api.interceptors.response.use(
   }
 );
 
-// Recorre todas las páginas de un endpoint paginado y devuelve la lista completa
+// Tamaño de página que se pide al backend (máx. permitido: 500)
+const PAGE_SIZE = 200;
+
+// Añade page_size a la URL si aún no lo trae, respetando la query existente
+const withPageSize = (url) => {
+  if (/[?&]page_size=/.test(url)) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}page_size=${PAGE_SIZE}`;
+};
+
+// Recorre todas las páginas de un endpoint paginado y devuelve la lista completa.
+// La primera petición pide page_size=200; las siguientes siguen el "next" del backend.
 export const fetchAll = async (url) => {
   const results = [];
-  let next = url;
+  let next = withPageSize(url);
   while (next) {
     const { data } = await api.get(next);
     if (Array.isArray(data)) return data;

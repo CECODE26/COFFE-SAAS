@@ -70,6 +70,9 @@ export const Distribuidor = () => {
   const totalSales = Object.values(byCafe).reduce((a, c) => a + c.ventas, 0);
   const activeOrders = Object.values(byCafe).reduce((a, c) => a + c.activos, 0);
 
+  // Personas del equipo y cuántas tienen la cuenta activa (mismo dato que la tarjeta "Equipo")
+  const activeUsers = users.filter((u) => u.is_active).length;
+
   const roleCounts = useMemo(() => {
     const acc = {};
     users.forEach((u) => (acc[u.role] = (acc[u.role] || 0) + 1));
@@ -166,7 +169,7 @@ export const Distribuidor = () => {
                   key={c.id}
                   padded={false}
                   className="animate-fade-in overflow-hidden hover:shadow-lift"
-                  style={{ animationDelay: `${i * 60}ms` }}
+                  style={{ animationDelay: `${Math.min(i, 10) * 60}ms` }}
                 >
                   {/* Fachada: toldo fino sobre cabecera verde bosque */}
                   <div className="relative border-b-2 border-oro-300 bg-verde-700 text-marfil">
@@ -235,7 +238,7 @@ export const Distribuidor = () => {
 
             <Card className="lg:col-span-2">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                <SectionTitle script="La brigada" title="Tu equipo" subtitle={`${users.length} personas en la red`} />
+                <SectionTitle script="La brigada" title="Tu equipo" subtitle={`${users.length} ${users.length === 1 ? 'persona' : 'personas'} · ${activeUsers} ${activeUsers === 1 ? 'activa' : 'activas'}`} />
                 <Link to="/usuarios" className="enlace gap-1.5">
                   Ver <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                 </Link>

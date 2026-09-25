@@ -42,13 +42,14 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
     cafeteria_name = serializers.CharField(source='cafeteria.name', read_only=True)
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'status', 'order_type', 'total',
-            'is_paid', 'customer_info', 'items_count', 'created_at',
+            'is_paid', 'customer_info', 'items_count', 'items', 'created_at',
             'tenant', 'cafeteria', 'cafeteria_name'
         ]
         read_only_fields = ['id', 'order_number', 'created_at']
@@ -59,7 +60,15 @@ class OrderListSerializer(serializers.ModelSerializer):
         return obj.customer_name or "Cliente"
 
     def get_items_count(self, obj):
-        return obj.items.count()
+        # len() sobre .all() usa el prefetch de la vista (sin consulta extra)
+        return len(obj.items.all())
+
+    def get_items(self, obj):
+        """Resumen de items: [{menu_item_name, quantity}] (usa prefetch 'items__menu_item')"""
+        return [
+            {'menu_item_name': item.menu_item.name, 'quantity': item.quantity}
+            for item in obj.items.all()
+        ]
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
@@ -165,7 +174,15 @@ class OrderStateChangeSerializer(serializers.Serializer):
 
 class OrderPaymentSerializer(serializers.Serializer):
     """Serializer para registrar pago"""
-    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_METHOD_CHOICES)
+    # 'pendiente' no es un método de pago válido para marcar como pagado
+    payment_method = serializers.ChoiceField(
+        choices=[c for c in Order.PAYMENT_METHOD_CHOICES if c[0] != 'pendiente'],
+        error_messages={
+            'required': 'Debes indicar el método de pago: efectivo, tarjeta o transferencia.',
+            'null': 'Debes indicar el método de pago: efectivo, tarjeta o transferencia.',
+            'invalid_choice': 'Método de pago "{input}" no válido. Usa efectivo, tarjeta o transferencia.',
+        },
+    )
 
 
 class OrderStatsSerializer(serializers.Serializer):

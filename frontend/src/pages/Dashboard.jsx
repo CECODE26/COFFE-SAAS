@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Layout, PageHeader, Loader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
+import { money } from '../components/Stats';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users, Receipt, Armchair, Gauge, ArrowUpRight } from 'lucide-react';
 import api from '../services/api';
@@ -15,6 +16,17 @@ const greeting = () => {
   if (h < 19) return 'Buenas tardes';
   return 'Buenas noches';
 };
+
+// ¿La fecha ISO cae en el día de hoy (hora local del navegador)?
+const isToday = (iso) => {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+};
+
+// Roles que ven varios locales a la vez
+const MULTI_LOCAL_ROLES = ['distribuidor_admin', 'super_admin'];
 
 export const Dashboard = () => {
   const { pedidos, fetchMesas, fetchPedidos } = useData();
@@ -42,11 +54,18 @@ export const Dashboard = () => {
     loadData();
   }, [fetchMesas, fetchPedidos]);
 
+  // "Limpiando" en cobalto claro, como su insignia de estado
   const chartData = [
     { name: 'Disponibles', value: stats?.available_mesas || 0, color: '#7C9E5C' },
     { name: 'Ocupadas', value: stats?.occupied_mesas || 0, color: '#A4452F' },
     { name: 'Reservadas', value: stats?.reserved_mesas || 0, color: '#C39B45' },
+    { name: 'Limpiando', value: stats?.cleaning_mesas || 0, color: '#4A64B8' },
   ];
+
+  // Solo pedidos creados hoy: "En curso" es un subconjunto de ellos
+  const pedidosHoy = pedidos.filter((p) => isToday(p.created_at));
+  const enCursoHoy = pedidosHoy.filter((p) => !['entregada', 'cancelada'].includes(p.status)).length;
+  const multiLocal = MULTI_LOCAL_ROLES.includes(user?.role);
 
   const statCards = [
     {
@@ -58,8 +77,8 @@ export const Dashboard = () => {
     {
       icon: Receipt,
       label: 'En curso',
-      value: pedidos.filter(p => !['entregada', 'cancelada'].includes(p.status)).length,
-      hint: `pedidos de ${pedidos.length}`,
+      value: enCursoHoy,
+      hint: `de ${pedidosHoy.length} ${pedidosHoy.length === 1 ? 'pedido' : 'pedidos'} hoy`,
     },
     {
       icon: Gauge,
@@ -86,7 +105,7 @@ export const Dashboard = () => {
           <PageHeader
             eyebrow={today}
             title={`${greeting()}${user?.first_name ? `, ${user.first_name}` : ''}`}
-            subtitle="Así va tu cafetería hoy."
+            subtitle={multiLocal ? 'Así van tus locales hoy.' : 'Así va tu cafetería hoy.'}
           />
 
           {/* Métricas */}
@@ -102,7 +121,7 @@ export const Dashboard = () => {
                       ? 'bg-verde-700 text-marfil shadow-lift'
                       : 'border border-oro-200/80 bg-marfil shadow-soft'
                   }`}
-                  style={{ animationDelay: `${i * 60}ms` }}
+                  style={{ animationDelay: `${Math.min(i, 10) * 60}ms` }}
                 >
                   {/* Aro dorado interior en la tarjeta destacada */}
                   {featured && (
@@ -228,7 +247,7 @@ export const Dashboard = () => {
                         <p className="truncate font-medium tracking-wide text-verde-700">{pedido.order_number}</p>
                         <StatusBadge status={pedido.status} className="mt-1" />
                       </div>
-                      <span className="shrink-0 font-serif text-xl italic text-verde-700">${pedido.total}</span>
+                      <span className="shrink-0 font-serif text-xl italic text-verde-700">{money(pedido.total)}</span>
                     </li>
                   ))}
                 </ul>

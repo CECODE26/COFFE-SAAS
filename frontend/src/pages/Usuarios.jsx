@@ -19,6 +19,12 @@ const ROLE_TONE = {
   gerente: 'sage',
 };
 
+// Alcance de los roles que no pertenecen a un local concreto (columna "Local")
+const SCOPE_LABELS = {
+  super_admin: 'Toda la plataforma',
+  distribuidor_admin: 'Toda la red',
+};
+
 const GROUPS = {
   admins: ['super_admin', 'distribuidor_admin', 'cafe_admin'],
   staff: ['gerente', 'camarero', 'cajero', 'cocinero', 'usuario'],
@@ -126,7 +132,8 @@ export const Usuarios = () => {
                           {isSuper && u.tenant_name && (
                             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-oro-600">{u.tenant_name}</p>
                           )}
-                          <p>{u.cafeteria_name || (u.role === 'super_admin' ? 'Toda la plataforma' : '—')}</p>
+                          {/* Los admins de plataforma y de red no dependen de un local: se muestra su alcance */}
+                          <p>{SCOPE_LABELS[u.role] || u.cafeteria_name || '—'}</p>
                         </td>
                         <td className="px-3 py-3.5 text-verde-600">
                           {new Date(u.created_at).toLocaleDateString('es-EC', { day: 'numeric', month: 'short' })}

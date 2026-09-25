@@ -1,9 +1,9 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.utils import timezone
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 
 from .models import Mesa, Reserva
 from .serializers import (
@@ -15,13 +15,34 @@ from .serializers import (
 from apps.accounts.permissions import IsTenantMember, IsCafeUser, IsDistribuidorAdmin
 
 
+class IsPersonalReservas(BasePermission):
+    """
+    Personal que puede confirmar/cancelar reservas: el staff del local
+    (cafe_admin, gerente, camarero, cajero, cocinero), distribuidor_admin y super_admin.
+    Los clientes (rol 'usuario') quedan fuera. El alcance por local/tenant lo
+    da ReservaViewSet.get_queryset (get_object() devuelve 404 fuera de él).
+    """
+    message = "Solo el personal del local puede confirmar o cancelar reservas."
+    ROLES_LOCAL = ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero']
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.role in ['super_admin', 'distribuidor_admin']:
+            return True
+        return user.role in self.ROLES_LOCAL and user.cafeteria_id is not None
+
+
 class MesaViewSet(viewsets.ModelViewSet):
     """CRUD de Mesas"""
     queryset = Mesa.objects.all()
     permission_classes = [IsAuthenticated, IsTenantMember]
     search_fields = ['number', 'description', 'location']
     ordering_fields = ['number', 'status', 'capacity']
-    ordering = ['number']
+    # Orden estable (local, número) para que la paginación no repita ni omita mesas.
+    # 'id' desempata si dos locales tuvieran el mismo nombre.
+    ordering = ['cafeteria__name', 'number', 'id']
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -42,19 +63,51 @@ class MesaViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == 'super_admin':
-            return Mesa.objects.all()
+            queryset = Mesa.objects.all()
+        elif user.role == 'distribuidor_admin':
+            queryset = Mesa.objects.filter(tenant=user.tenant)
+        elif user.cafeteria:
+            queryset = Mesa.objects.filter(cafeteria=user.cafeteria)
+        else:
+            return Mesa.objects.none()
 
-        if user.role == 'distribuidor_admin':
-            return Mesa.objects.filter(tenant=user.tenant)
+        # Las mesas de locales cerrados (cafeteria.is_active=False) no forman parte de la
+        # operación: no se listan ni se pueden ocupar/liberar (get_object() da 404), y
+        # stats/available/occupied/by_qr cuentan solo mesas de locales abiertos.
+        # Aplica también a super_admin. Las reservas de esos locales siguen en ReservaViewSet.
+        queryset = queryset.filter(cafeteria__is_active=True)
 
-        if user.cafeteria:
-            return Mesa.objects.filter(cafeteria=user.cafeteria)
-
-        return Mesa.objects.none()
+        # Orden estable también para las acciones que no pasan por OrderingFilter
+        return queryset.select_related('cafeteria', 'current_order').order_by(
+            'cafeteria__name', 'number', 'id'
+        )
 
     def perform_create(self, serializer):
         """Crear mesa"""
         serializer.save()
+
+    def _bloqueo_por_pedido_abierto(self, mesa):
+        """
+        Una mesa solo deja de estar ocupada cuando no tiene pedidos abiertos de tipo mesa
+        (abierto = no cancelado y no pagado). Si queda alguno, devuelve un 400 que el
+        frontend muestra tal cual; si no, None.
+        """
+        abierto = mesa.orders.filter(order_type='mesa', is_paid=False).exclude(
+            status='cancelada'
+        ).order_by('created_at').first()
+        if abierto is None:
+            return None
+        # Un pedido entregado ya no se puede cancelar: solo queda cobrarlo
+        que_hacer = 'cóbralo' if abierto.status == 'entregada' else 'cóbralo o cancélalo'
+        return Response(
+            {
+                'error': (
+                    f'La mesa {mesa.number} tiene el pedido {abierto.order_number} abierto: '
+                    f'{que_hacer} antes de liberarla.'
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(detail=True, methods=['post'])
     def occupy(self, request, pk=None):
@@ -99,6 +152,10 @@ class MesaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+        if bloqueo:
+            return bloqueo
+
         mesa.free()
 
         return Response(
@@ -114,6 +171,10 @@ class MesaViewSet(viewsets.ModelViewSet):
     def cleaning(self, request, pk=None):
         """Marcar mesa como en limpieza"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+        if bloqueo:
+            return bloqueo
+
         mesa.cleaning()
 
         return Response(
@@ -128,6 +189,10 @@ class MesaViewSet(viewsets.ModelViewSet):
     def maintenance(self, request, pk=None):
         """Marcar mesa como en mantenimiento"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+        if bloqueo:
+            return bloqueo
+
         mesa.maintenance()
 
         return Response(
@@ -147,6 +212,12 @@ class MesaViewSet(viewsets.ModelViewSet):
 
         new_status = serializer.validated_data['status']
         guest_count = serializer.validated_data.get('guest_count')
+
+        # Salir de 'ocupada' exige que no quede ningún pedido abierto en la mesa
+        if new_status != 'ocupada':
+            bloqueo = self._bloqueo_por_pedido_abierto(mesa)
+            if bloqueo:
+                return bloqueo
 
         mesa.status = new_status
 
@@ -202,15 +273,11 @@ class MesaViewSet(viewsets.ModelViewSet):
         reserved = queryset.filter(status='reservada').count()
         cleaning = queryset.filter(status='limpiando').count()
 
-        # Ocupación promedio
-        occupied_capacity = queryset.filter(status='ocupada').aggregate(
-            count=Count('id')
-        )['count'] or 0
-        total_capacity = queryset.aggregate(
-            total=Count('id')
-        )['total'] or 1
+        # Capacidad total = suma de asientos de todas las mesas (no el número de mesas)
+        total_capacity = queryset.aggregate(total=Sum('capacity'))['total'] or 0
 
-        average_occupancy = (occupied_capacity / total_capacity) * 100 if total_capacity > 0 else 0
+        # Ocupación promedio: % de mesas ocupadas sobre el total de mesas
+        average_occupancy = (occupied / total_mesas) * 100 if total_mesas > 0 else 0
 
         stats_data = {
             'total_mesas': total_mesas,
@@ -219,7 +286,7 @@ class MesaViewSet(viewsets.ModelViewSet):
             'reserved_mesas': reserved,
             'cleaning_mesas': cleaning,
             'average_occupancy': round(average_occupancy, 2),
-            'total_capacity': queryset.aggregate(cap=Count('capacity'))['cap'] or 0,
+            'total_capacity': total_capacity,
         }
 
         serializer = MesaStatsSerializer(stats_data)
@@ -253,7 +320,8 @@ class ReservaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsTenantMember]
     search_fields = ['customer_name', 'customer_phone', 'customer_email']
     ordering_fields = ['reservation_date', 'reservation_time', 'status']
-    ordering = ['reservation_date', 'reservation_time']
+    # 'id' desempata reservas a la misma fecha y hora (paginación estable)
+    ordering = ['reservation_date', 'reservation_time', 'id']
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -268,7 +336,9 @@ class ReservaViewSet(viewsets.ModelViewSet):
         if self.action in ['create']:
             return [IsAuthenticated()]
         elif self.action in ['confirm', 'cancel']:
-            return [IsAuthenticated(), IsDistribuidorAdmin()]
+            # Personal del local, distribuidor_admin o super_admin. get_queryset ya limita
+            # a las reservas de su local / tenant; fuera de él get_object() da 404.
+            return [IsAuthenticated(), IsPersonalReservas()]
         return [IsAuthenticated(), IsTenantMember()]
 
     def get_queryset(self):
@@ -276,19 +346,19 @@ class ReservaViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == 'super_admin':
-            return Reserva.objects.all()
-
-        if user.role == 'distribuidor_admin':
-            return Reserva.objects.filter(mesa__tenant=user.tenant)
-
-        if user.cafeteria:
-            return Reserva.objects.filter(mesa__cafeteria=user.cafeteria)
-
+            queryset = Reserva.objects.all()
+        elif user.role == 'distribuidor_admin':
+            queryset = Reserva.objects.filter(mesa__tenant=user.tenant)
+        elif user.cafeteria:
+            queryset = Reserva.objects.filter(mesa__cafeteria=user.cafeteria)
         # Clientes solo ven sus propias reservas
-        if user.role == 'usuario':
-            return Reserva.objects.filter(customer_email=user.email)
+        elif user.role == 'usuario':
+            queryset = Reserva.objects.filter(customer_email=user.email)
+        else:
+            return Reserva.objects.none()
 
-        return Reserva.objects.none()
+        # mesa_number y cafeteria_name sin N+1
+        return queryset.select_related('mesa__cafeteria')
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

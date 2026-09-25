@@ -33,7 +33,8 @@ export const Plataforma = () => {
   const [tenants, setTenants] = useState([]);
   const [cafes, setCafes] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [usersCount, setUsersCount] = useState(0);
+  // Usuarios de la plataforma: activos (como la tabla) y total de cuentas
+  const [users, setUsers] = useState({ active: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [openMenu, setOpenMenu] = useState(null);
 
@@ -42,12 +43,12 @@ export const Plataforma = () => {
       fetchAll('/tenants/'),
       fetchAll('/cafeterias/'),
       fetchAll('/pedidos/orders/'),
-      api.get('/auth/users/'),
+      fetchAll('/auth/users/'),
     ]);
     setTenants(t);
     setCafes(c);
     setOrders(o);
-    setUsersCount(u.data.count ?? u.data.length);
+    setUsers({ active: u.filter((x) => x.is_active).length, total: u.length });
   }, []);
 
   useEffect(() => {
@@ -66,10 +67,12 @@ export const Plataforma = () => {
   }, [orders]);
 
   const totalSales = Object.values(salesByTenant).reduce((a, b) => a + b, 0);
+  // Mismo criterio que el monto: solo pedidos no cancelados
+  const validOrders = orders.filter((o) => o.status !== 'cancelada').length;
   const activeTenants = tenants.filter((t) => t.status === 'active').length;
 
   const chartData = tenants
-    .map((t) => ({ name: t.name, value: Math.round(salesByTenant[t.id] || 0), plan: t.plan }))
+    .map((t) => ({ name: t.name, value: Math.round((salesByTenant[t.id] || 0) * 100) / 100, plan: t.plan }))
     .sort((a, b) => b.value - a.value);
 
   const planCounts = Object.keys(PLAN_LABELS).map((p) => ({ plan: p, count: tenants.filter((t) => t.plan === p).length }));
@@ -100,8 +103,8 @@ export const Plataforma = () => {
           <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <StatTile featured icon={Network} label="Distribuidores" value={tenants.length} hint={`${activeTenants} activos`} />
             <StatTile icon={Store} label="Cafeterías" value={cafes.length} hint={`${cafes.filter((c) => c.is_active).length} abiertas`} delay={60} />
-            <StatTile icon={Users} label="Usuarios" value={usersCount} hint="en toda la plataforma" delay={120} />
-            <StatTile icon={CircleDollarSign} label="Volumen" value={money(totalSales)} hint={`${orders.length} pedidos`} delay={180} />
+            <StatTile icon={Users} label="Usuarios" value={users.active} hint={`de ${users.total} en total`} delay={120} />
+            <StatTile icon={CircleDollarSign} label="Volumen" value={money(totalSales)} hint={`${validOrders} ${validOrders === 1 ? 'pedido no cancelado' : 'pedidos no cancelados'}`} delay={180} />
           </div>
 
           {/* Distribuidores */}

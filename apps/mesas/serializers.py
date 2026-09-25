@@ -108,14 +108,17 @@ class MesaStatusChangeSerializer(serializers.Serializer):
 
 class ReservaListSerializer(serializers.ModelSerializer):
     mesa_number = serializers.IntegerField(source='mesa.number', read_only=True)
+    # Nombre del local al que pertenece la mesa
+    cafeteria_name = serializers.CharField(source='mesa.cafeteria.name', read_only=True)
     days_until = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserva
         fields = [
-            'id', 'mesa', 'mesa_number', 'customer_name', 'customer_phone',
+            'id', 'mesa', 'mesa_number', 'cafeteria_name',
+            'customer_name', 'customer_phone', 'customer_email',
             'guest_count', 'reservation_date', 'reservation_time',
-            'status', 'days_until'
+            'status', 'notes', 'days_until'
         ]
         read_only_fields = ['id']
 

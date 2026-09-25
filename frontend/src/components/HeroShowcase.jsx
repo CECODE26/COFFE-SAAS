@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Float, LiveNumber, EASE, useLayer } from './Motion';
 import { Badge } from './StatusBadge';
+import { money } from './Stats';
 import { Coffee, Croissant, Sandwich, TrendingUp } from 'lucide-react';
 
 const ITEMS = [
@@ -60,8 +61,9 @@ const OrderStream = () => {
         <Etiqueta>Cocina · en vivo</Etiqueta>
         <PuntoVivo />
       </div>
-      {/* Altura mínima para 4 pedidos: la tarjeta no salta al entrar o salir uno */}
-      <ul className="min-h-[196px] space-y-2.5">
+      {/* Altura FIJA (4 filas de 46px + separaciones): los pedidos entran y salen por dentro
+          sin cambiar el tamaño de la tarjeta, así no empuja el resto de la página */}
+      <ul className="h-[214px] space-y-2.5 overflow-hidden">
         <AnimatePresence initial={false}>
           {orders.map((o) => {
             const [label, tone] = STATUS[o.status];
@@ -73,7 +75,7 @@ const OrderStream = () => {
                 animate={{ opacity: 1, x: 0, height: 'auto' }}
                 exit={{ opacity: 0, x: 24, height: 0 }}
                 transition={{ duration: 0.45, ease: EASE }}
-                className="flex items-center gap-3 overflow-hidden"
+                className="flex min-h-[46px] items-center gap-3 overflow-hidden"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-oro-200 bg-pistacho-100 text-verde-700">
                   <o.Icon className="h-4 w-4" aria-hidden="true" />
@@ -111,7 +113,7 @@ const SalesCard = () => {
         <div>
           <Etiqueta>Ventas de hoy</Etiqueta>
           <p className="mt-1 font-serif text-3xl font-medium italic text-verde-700">
-            <LiveNumber start={412.5} step={[1.8, 6.5]} every={2600} prefix="$" decimals={2} />
+            <LiveNumber start={412.5} step={[1.8, 6.5]} every={2600} format={money} />
           </p>
         </div>
         <Badge tone="sage" dot={false}>

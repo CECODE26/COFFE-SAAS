@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useData } from '../hooks/useData';
+import { useAuth } from '../hooks/useAuth';
 import { Layout, PageHeader, Loader, EmptyState, Segmented } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -7,8 +8,32 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Phone, Mail, CalendarDays, Users, Armchair, Check, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Roles que ven reservas de varios locales
+const MULTI_LOCAL_ROLES = ['distribuidor_admin', 'super_admin'];
+
+// Fecha local de hoy como "YYYY-MM-DD" (mismo formato que reservation_date)
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Clave ordenable fecha+hora: "YYYY-MM-DDTHH:MM"
+const slotKey = (r) => `${(r.reservation_date || '').slice(0, 10)}T${(r.reservation_time || '').slice(0, 5)}`;
+
+// Próximas primero (hoy y futuro, de la más cercana a la más lejana); luego pasadas (de la más reciente a la más antigua)
+const sortReservas = (list) => {
+  const today = todayKey();
+  const proximas = [];
+  const pasadas = [];
+  list.forEach((r) => ((r.reservation_date || '').slice(0, 10) >= today ? proximas : pasadas).push(r));
+  proximas.sort((a, b) => slotKey(a).localeCompare(slotKey(b)));
+  pasadas.sort((a, b) => slotKey(b).localeCompare(slotKey(a)));
+  return [...proximas, ...pasadas];
+};
+
 export const Reservas = () => {
   const { reservas, fetchReservas, confirmReserva } = useData();
+  const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +61,14 @@ export const Reservas = () => {
     }
   };
 
+  const sortedReservas = useMemo(() => sortReservas(reservas), [reservas]);
   const filteredReservas = filter === 'all'
-    ? reservas
-    : reservas.filter(r => r.status === filter);
+    ? sortedReservas
+    : sortedReservas.filter(r => r.status === filter);
+
+  // Nombre del local visible solo cuando el usuario ve más de uno
+  const multiCafe =
+    MULTI_LOCAL_ROLES.includes(user?.role) || new Set(reservas.map((r) => r.cafeteria_name).filter(Boolean)).size > 1;
 
   return (
     <Layout>
@@ -75,7 +105,7 @@ export const Reservas = () => {
                     key={reserva.id}
                     padded={false}
                     className="animate-fade-in flex flex-col overflow-hidden hover:shadow-lift sm:flex-row"
-                    style={{ animationDelay: `${i * 40}ms` }}
+                    style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
                   >
                     {/* Bloque de fecha */}
                     <div className="flex shrink-0 items-center gap-4 border-b-2 border-oro-300 bg-verde-700 px-6 py-4 text-marfil sm:w-36 sm:flex-col sm:justify-center sm:gap-0 sm:border-b-0 sm:border-r-2 sm:py-6">
@@ -89,15 +119,20 @@ export const Reservas = () => {
 
                     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 md:flex-row md:items-center">
                       <div className="min-w-0 flex-1">
+                        {multiCafe && reserva.cafeteria_name && (
+                          <p className="eyebrow mb-1 truncate">{reserva.cafeteria_name}</p>
+                        )}
                         <div className="flex flex-wrap items-center gap-3">
                           <h3 className="font-serif text-2xl italic font-medium text-verde-700">{reserva.customer_name}</h3>
                           <StatusBadge status={reserva.status} />
                         </div>
                         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-verde-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5 text-oro-600" aria-hidden="true" />
-                            {reserva.customer_phone}
-                          </span>
+                          {reserva.customer_phone && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5 text-oro-600" aria-hidden="true" />
+                              {reserva.customer_phone}
+                            </span>
+                          )}
                           {reserva.customer_email && (
                             <span className="inline-flex min-w-0 items-center gap-1.5">
                               <Mail className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />

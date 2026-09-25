@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useData } from '../hooks/useData';
 import { Layout, PageHeader, Loader, EmptyState, Segmented } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -18,12 +18,41 @@ const ACCENT = {
   neutral: 'bg-verde-200',
 };
 
+// Estados desde los que se puede sentar a clientes (abre el modal de "¿Cuántos llegan?")
+const SEATABLE = ['disponible', 'reservada'];
+
+// Mensaje del backend ({ error } o { detail }) o uno genérico si no lo hay
+const apiError = (error, fallback) => {
+  const data = error?.response?.data;
+  const msg = data?.error || data?.detail;
+  return typeof msg === 'string' ? msg : fallback;
+};
+
+// Orden estable: por local (nombre y, si empatan, id) y luego por número de mesa
+const byCafeAndNumber = (a, b) =>
+  (a.cafeteria_name || '').localeCompare(b.cafeteria_name || '', 'es') ||
+  String(a.cafeteria ?? '').localeCompare(String(b.cafeteria ?? '')) ||
+  (a.number || 0) - (b.number || 0);
+
 export const Mesas = () => {
   const { mesas, fetchMesas, occupyMesa, freeMesa } = useData();
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [guestCount, setGuestCount] = useState(2);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  // Mesa con una petición en curso (evita dobles clics)
+  const [busyId, setBusyId] = useState(null);
+
+  // El modal de sentar está abierto si hay una mesa elegida que admite clientes
+  const seating = !!selectedMesa && SEATABLE.includes(selectedMesa.status);
+
+  // Cerrar el modal con Escape mientras está abierto
+  useEffect(() => {
+    if (!seating) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setSelectedMesa(null);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [seating]);
 
   useEffect(() => {
     const loadMesas = async () => {
@@ -40,30 +69,134 @@ export const Mesas = () => {
     loadMesas();
   }, [fetchMesas]);
 
-  const handleOccupy = async () => {
-    if (!selectedMesa) return;
+  // Abre el modal de sentar con un número de clientes razonable para la mesa
+  const openSeat = (mesa) => {
+    setGuestCount(Math.min(mesa.capacity, Math.max(mesa.min_capacity || 1, 2)));
+    setSelectedMesa(mesa);
+  };
 
+  // Sienta clientes en una mesa libre o a los de una reserva (misma acción: occupy)
+  const handleOccupy = async () => {
+    if (!selectedMesa || busyId) return;
+
+    setBusyId(selectedMesa.id);
     try {
       await occupyMesa(selectedMesa.id, guestCount);
-      toast.success(`Mesa ${selectedMesa.number} ocupada`);
+      toast.success(
+        selectedMesa.status === 'reservada'
+          ? `Reserva sentada en la mesa ${selectedMesa.number}`
+          : `Mesa ${selectedMesa.number} ocupada`
+      );
       setSelectedMesa(null);
     } catch (error) {
-      toast.error('Error al ocupar mesa');
+      toast.error(apiError(error, 'Error al ocupar mesa'));
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const handleFree = async (mesaId) => {
+  // Deja la mesa disponible: al liberar una ocupada o al terminar de limpiarla
+  const handleFree = async (mesaId, okMessage = 'Mesa liberada') => {
+    setBusyId(mesaId);
     try {
       await freeMesa(mesaId);
-      toast.success('Mesa liberada');
+      toast.success(okMessage);
     } catch (error) {
-      toast.error('Error al liberar mesa');
+      toast.error(apiError(error, 'Error al liberar mesa'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Acción principal de cada estado: etiqueta, variante del botón y qué hace al pulsar
+  const mesaAction = (mesa) => {
+    switch (mesa.status) {
+      case 'disponible':
+        return { label: 'Sentar clientes', variant: 'primary', onClick: () => openSeat(mesa) };
+      case 'reservada':
+        return { label: 'Sentar reserva', variant: 'primary', onClick: () => openSeat(mesa) };
+      case 'limpiando':
+        return { label: 'Mesa lista', variant: 'secondary', onClick: () => handleFree(mesa.id, 'Mesa lista') };
+      case 'ocupada':
+        return { label: 'Liberar mesa', variant: 'secondary', onClick: () => handleFree(mesa.id) };
+      default:
+        return null;
     }
   };
 
   const multiCafe = new Set(mesas.map((m) => m.cafeteria)).size > 1;
   const countBy = (s) => mesas.filter((m) => m.status === s).length;
-  const filtered = filter === 'all' ? mesas : mesas.filter((m) => m.status === filter);
+  const sorted = useMemo(() => [...mesas].sort(byCafeAndNumber), [mesas]);
+  const filtered = useMemo(
+    () => (filter === 'all' ? sorted : sorted.filter((m) => m.status === filter)),
+    [sorted, filter]
+  );
+
+  // Con varios locales, agrupa las mesas por cafetería (respetando el orden anterior)
+  const groups = useMemo(() => {
+    if (!multiCafe) return [{ key: 'all', name: null, mesas: filtered }];
+    const acc = [];
+    filtered.forEach((m) => {
+      const last = acc[acc.length - 1];
+      if (last && last.key === m.cafeteria) last.mesas.push(m);
+      else acc.push({ key: m.cafeteria, name: m.cafeteria_name || 'Local', mesas: [m] });
+    });
+    return acc;
+  }, [filtered, multiCafe]);
+
+  // Posición de cada mesa en la lista visible, para escalonar la animación con tope
+  const position = new Map(filtered.map((m, i) => [m.id, i]));
+
+  const renderMesa = (mesa) => {
+    const action = mesaAction(mesa);
+    return (
+      <Card
+        key={mesa.id}
+        padded={false}
+        className="animate-fade-in group relative overflow-hidden hover:shadow-lift"
+        style={{ animationDelay: `${Math.min(position.get(mesa.id) || 0, 10) * 40}ms` }}
+      >
+        <span className={`absolute inset-x-0 top-0 h-1.5 ${ACCENT[statusTone(mesa.status)]}`} aria-hidden="true" />
+        <span className="absolute inset-x-0 top-1.5 h-px bg-oro-300/80" aria-hidden="true" />
+        <div className="p-6 pt-7">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="stat-label truncate">Mesa</p>
+              <p className="mt-2 font-serif text-[3.25rem] italic font-medium leading-none text-verde-700">{mesa.number}</p>
+            </div>
+            <StatusBadge status={mesa.status} className="shrink-0" />
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-dashed border-oro-300/70 pt-4 text-sm text-verde-600">
+            {mesa.location && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-oro-600" aria-hidden="true" />
+                {mesa.location}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-oro-600" aria-hidden="true" />
+              {mesa.status === 'ocupada' ? `${mesa.guest_count} / ${mesa.capacity}` : `${mesa.capacity} pers.`}
+            </span>
+          </div>
+        </div>
+
+        {action && (
+          <div className="border-t border-oro-200/70 bg-crema/70 px-6 py-3">
+            <Button
+              size="sm"
+              variant={action.variant}
+              disabled={busyId === mesa.id}
+              onClick={action.onClick}
+              className="w-full"
+            >
+              {action.label}
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <Layout>
@@ -91,66 +224,31 @@ export const Mesas = () => {
           {filtered.length === 0 ? (
             <EmptyState icon={Armchair} title="Sin mesas aquí" description="Prueba con otro filtro." />
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((mesa, i) => (
-                <Card
-                  key={mesa.id}
-                  padded={false}
-                  className="animate-fade-in group relative overflow-hidden hover:shadow-lift"
-                  style={{ animationDelay: `${i * 40}ms` }}
-                >
-                  <span className={`absolute inset-x-0 top-0 h-1.5 ${ACCENT[statusTone(mesa.status)]}`} aria-hidden="true" />
-                  <span className="absolute inset-x-0 top-1.5 h-px bg-oro-300/80" aria-hidden="true" />
-                  <div className="p-6 pt-7">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="stat-label truncate">{mesa.cafeteria_name && multiCafe ? mesa.cafeteria_name : 'Mesa'}</p>
-                        <p className="mt-2 font-serif text-[3.25rem] italic font-medium leading-none text-verde-700">{mesa.number}</p>
-                      </div>
-                      <StatusBadge status={mesa.status} className="shrink-0" />
-                    </div>
-
-                    <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-dashed border-oro-300/70 pt-4 text-sm text-verde-600">
-                      {mesa.location && (
-                        <span className="inline-flex items-center gap-1.5">
-                          <MapPin className="h-4 w-4 text-oro-600" aria-hidden="true" />
-                          {mesa.location}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users className="h-4 w-4 text-oro-600" aria-hidden="true" />
-                        {mesa.status === 'ocupada' ? `${mesa.guest_count} / ${mesa.capacity}` : `${mesa.capacity} pers.`}
+            <div className="space-y-10">
+              {groups.map((g) => (
+                <section key={g.key}>
+                  {/* Encabezado del local (solo cuando hay varios): cursiva, filete y rombo dorado */}
+                  {g.name && (
+                    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <h2 className="min-w-0 font-serif text-2xl italic font-medium leading-tight text-verde-700">{g.name}</h2>
+                      <span className="flex min-w-[3rem] flex-1 items-center gap-2" aria-hidden="true">
+                        <span className="h-px flex-1 bg-oro-300" />
+                        <span className="rombo" />
+                        <span className="h-px w-5 bg-oro-300" />
+                      </span>
+                      <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-verde-600">
+                        {g.mesas.length} {g.mesas.length === 1 ? 'mesa' : 'mesas'}
                       </span>
                     </div>
-                  </div>
-
-                  {(mesa.status === 'disponible' || mesa.status === 'ocupada') && (
-                    <div className="border-t border-oro-200/70 bg-crema/70 px-6 py-3">
-                      {mesa.status === 'disponible' ? (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setGuestCount(Math.min(mesa.capacity, Math.max(mesa.min_capacity || 1, 2)));
-                            setSelectedMesa(mesa);
-                          }}
-                          className="w-full"
-                        >
-                          Sentar clientes
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="secondary" onClick={() => handleFree(mesa.id)} className="w-full">
-                          Liberar mesa
-                        </Button>
-                      )}
-                    </div>
                   )}
-                </Card>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{g.mesas.map(renderMesa)}</div>
+                </section>
               ))}
             </div>
           )}
 
-          {/* Modal para ocupar mesa */}
-          {selectedMesa && selectedMesa.status === 'disponible' && (
+          {/* Modal para sentar clientes (mesa libre o reservada); Escape lo cierra */}
+          {seating && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div
                 className="absolute inset-0 bg-verde-900/50 backdrop-blur-sm"
@@ -166,6 +264,7 @@ export const Mesas = () => {
               >
                 <ToldoFino />
                 <button
+                  type="button"
                   onClick={() => setSelectedMesa(null)}
                   className="absolute right-3 top-8 rounded-full p-2 text-verde-600 transition-colors hover:bg-pistacho-100 hover:text-verde-800"
                   aria-label="Cerrar"
@@ -214,7 +313,7 @@ export const Mesas = () => {
                     <Button variant="secondary" onClick={() => setSelectedMesa(null)} className="flex-1">
                       Cancelar
                     </Button>
-                    <Button onClick={handleOccupy} className="flex-1">
+                    <Button onClick={handleOccupy} disabled={busyId === selectedMesa.id} className="flex-1">
                       Confirmar
                     </Button>
                   </div>

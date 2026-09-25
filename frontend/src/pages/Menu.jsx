@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, PageHeader, Loader, EmptyState } from '../components/Layout';
 import { Badge } from '../components/StatusBadge';
+import { money } from '../components/Stats';
 import { BookOpen, Clock } from 'lucide-react';
 import api from '../services/api';
 
@@ -90,7 +91,7 @@ export const Menu = () => {
                             <div className="flex items-baseline gap-2">
                               <h3 className="min-w-0 font-serif text-lg italic font-medium leading-snug text-verde-700">{item.name}</h3>
                               <span className="mb-1 min-w-[1.5rem] flex-1 border-b-2 border-dotted border-oro-300" aria-hidden="true" />
-                              <span className="shrink-0 font-serif text-lg italic font-medium text-cobalto-500">${item.price}</span>
+                              <span className="shrink-0 font-serif text-lg italic font-medium text-cobalto-500">{money(item.price)}</span>
                             </div>
 
                             {item.description && (

@@ -70,9 +70,10 @@ export const DataProvider = ({ children }) => {
     }
   }, [fetchPedidos]);
 
-  const updatePedidoStatus = useCallback(async (pedidoId, action) => {
+  // `body` es opcional: mark_paid necesita { payment_method }
+  const updatePedidoStatus = useCallback(async (pedidoId, action, body) => {
     try {
-      await api.post(`/pedidos/orders/${pedidoId}/${action}/`);
+      await api.post(`/pedidos/orders/${pedidoId}/${action}/`, body);
       await fetchPedidos();
     } catch (err) {
       setError(err.message);
@@ -84,8 +85,9 @@ export const DataProvider = ({ children }) => {
   const fetchMenuItems = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/menu/items/available/');
-      setMenuItems(response.data.results || response.data);
+      // El endpoint pagina: se recorren todas las páginas
+      const data = await fetchAll('/menu/items/available/');
+      setMenuItems(data);
       setError(null);
     } catch (err) {
       setError(err.message);

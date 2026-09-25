@@ -1,7 +1,14 @@
 import React from 'react';
 
-export const money = (n) =>
-  `$${Number(n || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Formato único de dinero en toda la app: "$1,234.56" (USD, en-US, 2 decimales)
+const MONEY_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const money = (n) => {
+  const value = Number(n);
+  const safe = Number.isFinite(value) ? value : 0;
+  // El signo va delante del símbolo: "-$12.50"
+  return `${safe < 0 ? '-' : ''}$${MONEY_FORMAT.format(Math.abs(safe))}`;
+};
 
 // Aro dorado interior + sombra elevada para la tarjeta destacada
 const FEATURED_SHADOW =
