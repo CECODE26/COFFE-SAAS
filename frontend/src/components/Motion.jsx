@@ -183,7 +183,8 @@ export const Tilt = ({ children, className = '', max = 6 }) => {
   const ry = useSpring(0, { stiffness: 200, damping: 20 });
   const gx = useMotionValue(50);
   const gy = useMotionValue(50);
-  const glow = useTransform([gx, gy], ([x, y]) => `radial-gradient(360px circle at ${x}% ${y}%, rgba(232,162,74,0.22), transparent 60%)`);
+  // Brillo suave en oro y pistacho que sigue al cursor
+  const glow = useTransform([gx, gy], ([x, y]) => `radial-gradient(360px circle at ${x}% ${y}%, rgba(216,180,92,0.2), rgba(191,216,165,0.14) 35%, transparent 62%)`);
 
   const onMove = (e) => {
     if (reduce) return;

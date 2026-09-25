@@ -132,18 +132,20 @@ export const UserForm = ({ open, onClose, onCreated }) => {
               <button
                 key={role}
                 type="button"
+                aria-pressed={form.role === role}
                 onClick={() => setForm((f) => ({ ...f, role }))}
-                className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                className={`flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
                   form.role === role
-                    ? 'border-brass-400 bg-brass-50 ring-4 ring-brass-100'
-                    : 'border-espresso-100 bg-paper hover:border-brass-200'
+                    ? 'border-cobalto-500 bg-cobalto-50 text-cobalto-600 ring-4 ring-cobalto-100'
+                    : 'border-oro-200 bg-marfil text-verde-700 hover:border-oro-400 hover:bg-pistacho-50'
                 }`}
               >
-                <p className="text-sm font-medium text-espresso-800">{ROLE_LABELS[role]}</p>
+                <span className="font-serif text-[15px] italic font-medium leading-tight">{ROLE_LABELS[role]}</span>
+                {form.role === role && <span className="h-1.5 w-1.5 shrink-0 rotate-45 bg-oro-400" aria-hidden="true" />}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-espresso-400">{ROLE_HINTS[form.role]}</p>
+          <p className="mt-2 text-xs text-verde-600">{ROLE_HINTS[form.role]}</p>
         </Field>
 
         {(needsTenant || needsCafe) && (
@@ -200,15 +202,18 @@ export const UserForm = ({ open, onClose, onCreated }) => {
           </Field>
         </div>
 
-        <div className="rounded-2xl border border-foam bg-cream/50 p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="font-serif text-lg text-espresso-800">Contraseña inicial</p>
+        <div className="rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-2.5 font-serif text-lg italic font-medium text-verde-700">
+              <span className="rombo" aria-hidden="true" />
+              Contraseña inicial
+            </p>
             <button
               type="button"
               onClick={generate}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-brass-600 hover:text-brass-700"
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-2 text-[11px] font-medium uppercase tracking-[0.18em] text-cobalto-500 underline decoration-oro-400 underline-offset-4 transition-colors hover:text-verde-700"
             >
-              <Wand2 className="h-4 w-4" /> Generar
+              <Wand2 className="h-4 w-4" aria-hidden="true" /> Generar
             </button>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -226,10 +231,10 @@ export const UserForm = ({ open, onClose, onCreated }) => {
                 <button
                   type="button"
                   onClick={() => setShowPwd((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-espresso-300 hover:text-espresso-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-verde-600 transition-colors hover:text-cobalto-500"
                   aria-label={showPwd ? 'Ocultar' : 'Mostrar'}
                 >
-                  {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPwd ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
               </div>
             </Field>

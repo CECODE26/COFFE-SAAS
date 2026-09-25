@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LegalLayout } from '../../components/LegalLayout';
+import { Separador } from '../../components/Decor';
 import { Field, FormAlert, parseApiErrors } from '../../components/Form';
 import { SITE } from '../../config/site';
 import { Eye, PencilLine, Trash2, Ban, Download, PauseCircle, Bot, HelpCircle, CheckCircle2 } from 'lucide-react';
@@ -70,32 +71,51 @@ export const Derechos = () => {
       title="Ejercer mis derechos"
       intro="Según la Ley Orgánica de Protección de Datos Personales, puedes pedirnos en cualquier momento acceder, corregir, eliminar o llevarte tus datos. Es gratis y te respondemos en máximo 15 días."
     >
+      <div className="mb-5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.2em] text-verde-600">
+        <span className="rombo" aria-hidden="true" />
+        Elige el derecho que quieres ejercer
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {DERECHOS.map(({ id, icon: Icon, title, text }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setForm((f) => ({ ...f, tipo: id }));
-              setDone(null);
-              document.getElementById('formulario')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className={`flex gap-4 rounded-2xl border p-4 text-left no-underline transition-all ${
-              form.tipo === id ? 'border-clay-600 bg-white ring-4 ring-clay-500/10' : 'border-line bg-white hover:border-clay-500/40'
-            }`}
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-clay-600 text-white">
-              <Icon className="h-4 w-4" />
-            </span>
-            <span>
-              <span className="block font-semibold text-ink">{title}</span>
-              <span className="mt-0.5 block text-sm text-muted">{text}</span>
-            </span>
-          </button>
-        ))}
+        {DERECHOS.map(({ id, icon: Icon, title, text }) => {
+          const activo = form.tipo === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={activo}
+              onClick={() => {
+                setForm((f) => ({ ...f, tipo: id }));
+                setDone(null);
+                document.getElementById('formulario')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`group flex gap-4 rounded-2xl border bg-marfil p-4 text-left transition-all duration-200 sm:p-5 ${
+                activo
+                  ? 'border-cobalto-500 ring-4 ring-cobalto-100'
+                  : 'border-oro-300/70 hover:-translate-y-0.5 hover:border-cobalto-400 hover:shadow-soft'
+              }`}
+            >
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-1 ring-oro-400 ring-offset-2 ring-offset-marfil transition-colors ${
+                  activo ? 'bg-cobalto-500 text-marfil' : 'bg-verde-700 text-pistacho-200 group-hover:bg-cobalto-500'
+                }`}
+                aria-hidden="true"
+              >
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1.6} />
+              </span>
+              <span className="min-w-0">
+                <span className={`block font-serif text-lg italic font-medium leading-snug ${activo ? 'text-cobalto-500' : 'text-verde-700'}`}>
+                  {title}
+                </span>
+                <span className="mt-1 block text-sm leading-relaxed text-verde-600">{text}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <section id="formulario" className="scroll-mt-28 !mt-14">
+      <Separador className="my-14" />
+
+      <section id="formulario" className="scroll-mt-28">
         <h2>Envía tu solicitud</h2>
         <p>
           Si tus datos los registró una cafetería (por ejemplo, en una reserva), también puedes pedírselo directamente a
@@ -104,10 +124,12 @@ export const Derechos = () => {
         </p>
 
         {done ? (
-          <div className="not-prose mt-8 rounded-3xl border border-emerald-200 bg-emerald-50 p-8">
-            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-            <p className="mt-4 font-display text-2xl font-bold text-ink">Recibimos tu solicitud</p>
-            <p className="mt-2 text-muted">
+          <div role="status" className="mt-8 rounded-3xl border border-pistacho-400 bg-pistacho-100 p-6 sm:p-8">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-verde-700 text-pistacho-200 ring-1 ring-oro-400 ring-offset-2 ring-offset-pistacho-100">
+              <CheckCircle2 className="h-6 w-6" strokeWidth={1.6} />
+            </span>
+            <p className="mt-5 font-serif text-[1.75rem] italic font-medium !leading-tight !text-verde-700">Recibimos tu solicitud</p>
+            <p className="!text-verde-700">
               Tu código de seguimiento es <strong>{done.codigo}</strong>. Te responderemos a <strong>{done.email}</strong>{' '}
               a más tardar el{' '}
               <strong>
@@ -117,7 +139,7 @@ export const Derechos = () => {
             </p>
             <button
               type="button"
-              className="btn-secondary mt-6 !py-2.5 text-sm"
+              className="btn-secondary mt-6"
               onClick={() => {
                 setDone(null);
                 setForm(EMPTY);
@@ -127,7 +149,10 @@ export const Derechos = () => {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="card mt-8 space-y-5 p-6 sm:p-8">
+          <form
+            onSubmit={handleSubmit}
+            className="card mt-8 space-y-5 p-5 sm:p-8 [&_.field-error]:!text-terracotta-700 [&_.form-alert_p]:!text-terracotta-700"
+          >
             <FormAlert>{errors.general}</FormAlert>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -181,12 +206,12 @@ export const Derechos = () => {
               />
             </Field>
 
-            <label className="flex cursor-pointer items-start gap-3 text-sm text-muted">
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-oro-200/80 bg-crema/60 p-4 text-sm leading-relaxed text-verde-600">
               <input
                 type="checkbox"
                 checked={form.declaracion_veracidad}
                 onChange={set('declaracion_veracidad')}
-                className="mt-0.5 h-4 w-4 rounded accent-clay-600"
+                className="mt-1 h-4 w-4 shrink-0 rounded accent-verde-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cobalto-500"
                 required
               />
               <span>
@@ -195,11 +220,14 @@ export const Derechos = () => {
                 <Link to="/legal/privacidad">Política de privacidad</Link>.
               </span>
             </label>
-            {err('declaracion_veracidad') && <p className="text-xs text-red-700">{err('declaracion_veracidad')}</p>}
+            {err('declaracion_veracidad') && <p className="text-xs !text-terracotta-700">{err('declaracion_veracidad')}</p>}
 
-            <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted">Respuesta en máximo 15 días, sin costo.</p>
-              <button type="submit" disabled={sending} className="btn-primary disabled:opacity-50">
+            <div className="flex flex-col-reverse gap-4 border-t border-oro-200/80 pt-6 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex items-center gap-2 text-xs text-verde-600">
+                <span className="rombo shrink-0 scale-75" aria-hidden="true" />
+                Respuesta en máximo 15 días, sin costo.
+              </p>
+              <button type="submit" disabled={sending} className="btn-primary disabled:pointer-events-none disabled:opacity-60">
                 {sending ? 'Enviando…' : 'Enviar solicitud'}
               </button>
             </div>
@@ -207,7 +235,9 @@ export const Derechos = () => {
         )}
       </section>
 
-      <section className="!mt-14">
+      <Separador className="my-14" />
+
+      <section>
         <h2>¿No quedaste conforme?</h2>
         <p>
           Puedes presentar un reclamo ante la Superintendencia de Protección de Datos Personales en{' '}

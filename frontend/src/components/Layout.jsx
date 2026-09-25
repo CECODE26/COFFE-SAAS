@@ -56,7 +56,7 @@ const SidebarContent = ({ onNavigate }) => {
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon className={`h-[17px] w-[17px] ${isActive ? 'text-cobalto-500' : 'text-pistacho-300 group-hover:text-oro-300'}`} />
+                      <Icon aria-hidden="true" className={`h-[17px] w-[17px] ${isActive ? 'text-cobalto-500' : 'text-pistacho-300 group-hover:text-oro-300'}`} />
                       {label}
                       {isActive && <span className="ml-auto h-1.5 w-1.5 rotate-45 bg-oro-400" />}
                     </>
@@ -83,7 +83,7 @@ const SidebarContent = ({ onNavigate }) => {
             aria-label="Cerrar sesión"
             className="rounded-full p-2 text-verde-200 transition-colors hover:bg-white/10 hover:text-marfil"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -139,7 +139,7 @@ export const Layout = ({ children }) => {
               className="absolute right-3 top-9 z-10 rounded-full p-2 text-verde-200 hover:text-marfil"
               aria-label="Cerrar menú"
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" aria-hidden="true" />
             </button>
             <SidebarContent onNavigate={() => setMenuOpen(false)} />
           </aside>
@@ -172,7 +172,7 @@ export const Loader = () => (
 export const EmptyState = ({ icon: Icon = Coffee, title, description }) => (
   <Card className="flex flex-col items-center justify-center py-16 text-center">
     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-pistacho-100 text-cobalto-500 ring-1 ring-oro-300">
-      <Icon className="h-6 w-6" />
+      <Icon className="h-6 w-6" aria-hidden="true" />
     </div>
     <p className="font-serif text-2xl italic text-verde-700">{title}</p>
     {description && <p className="mt-1 text-sm text-verde-600">{description}</p>}

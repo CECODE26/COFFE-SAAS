@@ -2,6 +2,8 @@ import React, { useEffect, useId, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 
 export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, footer, size = 'md' }) => {
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -19,28 +21,44 @@ export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, foote
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-espresso-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-verde-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
-        className={`animate-fade-in relative flex max-h-[92vh] w-full ${widths[size]} flex-col rounded-t-3xl border border-espresso-100/70 bg-paper shadow-lift sm:rounded-3xl`}
+        aria-labelledby={titleId}
+        className={`animate-fade-in relative flex max-h-[92vh] w-full ${widths[size]} flex-col rounded-t-3xl border border-oro-300/70 bg-marfil shadow-lift sm:rounded-3xl`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-foam px-7 pb-5 pt-7">
-          <div>
-            {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-            <h2 className="text-3xl font-medium text-espresso-800">{title}</h2>
-            {subtitle && <p className="mt-1 text-sm text-espresso-400">{subtitle}</p>}
+        {/* Cabecera: antetítulo manuscrito, título en cursiva y filete de oro */}
+        <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-6 sm:px-7 sm:pt-7">
+          <div className="min-w-0">
+            {eyebrow && <p className="mb-1 font-script text-[22px] leading-none text-oro-600">{eyebrow}</p>}
+            <h2 id={titleId} className="font-serif text-[1.75rem] italic font-medium leading-tight text-verde-700 sm:text-3xl">
+              {title}
+            </h2>
+            {subtitle && <p className="mt-1.5 text-sm text-verde-600">{subtitle}</p>}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-espresso-300 hover:bg-foam hover:text-espresso-700"
+            className="shrink-0 rounded-full p-2 text-verde-600 ring-1 ring-oro-200 transition-colors hover:bg-pistacho-100 hover:text-cobalto-500"
             aria-label="Cerrar"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-7 py-6">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-foam bg-cream/40 px-7 py-4 sm:rounded-b-3xl">{footer}</div>}
+        <div className="flex items-center gap-3 px-5 sm:px-7" aria-hidden="true">
+          <span className="h-px flex-1 bg-oro-300/70" />
+          <span className="rombo" />
+          <span className="h-px flex-1 bg-oro-300/70" />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7">{children}</div>
+
+        {footer && (
+          <div className="flex flex-wrap justify-end gap-2 border-t border-oro-200/80 bg-crema px-5 py-4 sm:rounded-b-3xl sm:px-7">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -56,14 +74,14 @@ export const Field = ({ label, error, hint, required, children, className = '' }
       {label && (
         <label className="label" htmlFor={linkable ? control.props.id : undefined}>
           {label}
-          {required && <span className="ml-0.5 text-brass-500">*</span>}
+          {required && <span className="ml-0.5 text-oro-600">*</span>}
         </label>
       )}
       {control}
       {error ? (
         <p className="field-error mt-1.5 text-xs text-terracotta-700">{error}</p>
       ) : (
-        hint && <p className="field-hint mt-1.5 text-xs text-espresso-400">{hint}</p>
+        hint && <p className="field-hint mt-1.5 text-xs text-verde-600">{hint}</p>
       )}
     </div>
   );
@@ -78,9 +96,9 @@ export const FormAlert = ({ children }) => {
     <div
       ref={ref}
       role="alert"
-      className="form-alert mb-5 flex items-start gap-2.5 rounded-xl border border-terracotta-100 bg-terracotta-100/50 px-4 py-3 text-sm text-terracotta-700"
+      className="form-alert mb-5 flex items-start gap-2.5 rounded-2xl border border-terracotta-600/25 bg-terracotta-100/60 px-4 py-3 text-sm text-terracotta-700"
     >
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <p>{children}</p>
     </div>
   ) : null;

@@ -78,58 +78,59 @@ export const Reservas = () => {
                     style={{ animationDelay: `${i * 40}ms` }}
                   >
                     {/* Bloque de fecha */}
-                    <div className="flex shrink-0 items-center gap-4 bg-espresso-800 px-6 py-4 text-cream sm:w-36 sm:flex-col sm:justify-center sm:gap-0 sm:py-6">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brass-300">
+                    <div className="flex shrink-0 items-center gap-4 border-b-2 border-oro-300 bg-verde-700 px-6 py-4 text-marfil sm:w-36 sm:flex-col sm:justify-center sm:gap-0 sm:border-b-0 sm:border-r-2 sm:py-6">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.26em] text-oro-300">
                         {date.toLocaleDateString('es-EC', { month: 'short' }).replace('.', '')}
                       </p>
-                      <p className="font-serif text-4xl font-medium leading-none sm:my-1 sm:text-5xl">{date.getDate()}</p>
-                      <p className="text-sm text-espresso-200">{reserva.reservation_time?.slice(0, 5)}</p>
+                      <p className="font-serif text-4xl italic font-medium leading-none sm:my-1.5 sm:text-5xl">{date.getDate()}</p>
+                      <span className="mb-2 mt-1 hidden h-1.5 w-1.5 rotate-45 bg-oro-400 sm:block" aria-hidden="true" />
+                      <p className="text-sm tracking-[0.12em] text-verde-100">{reserva.reservation_time?.slice(0, 5)}</p>
                     </div>
 
-                    <div className="flex flex-1 flex-col gap-4 p-6 md:flex-row md:items-center">
+                    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 md:flex-row md:items-center">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-2xl font-medium text-espresso-800">{reserva.customer_name}</h3>
+                          <h3 className="font-serif text-2xl italic font-medium text-verde-700">{reserva.customer_name}</h3>
                           <StatusBadge status={reserva.status} />
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-espresso-400">
+                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-verde-600">
                           <span className="inline-flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5" />
+                            <Phone className="h-3.5 w-3.5 text-oro-600" aria-hidden="true" />
                             {reserva.customer_phone}
                           </span>
                           {reserva.customer_email && (
-                            <span className="inline-flex items-center gap-1.5">
-                              <Mail className="h-3.5 w-3.5" />
-                              {reserva.customer_email}
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
+                              <span className="min-w-0 break-all">{reserva.customer_email}</span>
                             </span>
                           )}
                         </div>
                         {reserva.notes && (
-                          <p className="mt-3 inline-flex items-start gap-2 rounded-lg bg-brass-50 px-3 py-2 text-sm text-espresso-600">
-                            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-brass-500" />
+                          <p className="mt-3 inline-flex items-start gap-2 rounded-2xl border border-oro-200/80 bg-oro-50 px-3 py-2 text-sm text-verde-700">
+                            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" />
                             {reserva.notes}
                           </p>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-6 md:border-l md:border-foam md:pl-6">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-dashed border-oro-300/70 pt-4 md:border-l md:border-t-0 md:border-solid md:border-oro-200/80 md:pl-6 md:pt-0">
                         <div>
                           <p className="stat-label">Mesa</p>
-                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl text-espresso-800">
-                            <Armchair className="h-4 w-4 text-brass-500" />
+                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl italic text-verde-700">
+                            <Armchair className="h-4 w-4 text-oro-600" aria-hidden="true" />
                             {reserva.mesa_number}
                           </p>
                         </div>
                         <div>
                           <p className="stat-label">Personas</p>
-                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl text-espresso-800">
-                            <Users className="h-4 w-4 text-brass-500" />
+                          <p className="inline-flex items-center gap-1.5 font-serif text-2xl italic text-verde-700">
+                            <Users className="h-4 w-4 text-oro-600" aria-hidden="true" />
                             {reserva.guest_count}
                           </p>
                         </div>
                         {reserva.status === 'pendiente' && (
                           <Button size="sm" onClick={() => handleConfirm(reserva.id)}>
-                            <Check className="h-4 w-4" />
+                            <Check className="h-4 w-4" aria-hidden="true" />
                             Confirmar
                           </Button>
                         )}

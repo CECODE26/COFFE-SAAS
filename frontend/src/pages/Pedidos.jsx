@@ -79,42 +79,46 @@ export const Pedidos = () => {
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
                   <div className="flex items-start justify-between gap-4 p-6 pb-4">
-                    <div>
-                      {pedido.cafeteria_name && <p className="eyebrow mb-1">{pedido.cafeteria_name}</p>}
-                      <h3 className="text-2xl font-medium text-espresso-800">{pedido.order_number}</h3>
-                      <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-espresso-400">
-                        <Clock className="h-3.5 w-3.5" />
+                    <div className="min-w-0">
+                      {pedido.cafeteria_name && <p className="eyebrow mb-1 truncate">{pedido.cafeteria_name}</p>}
+                      <h3 className="font-serif text-2xl italic font-medium text-verde-700">{pedido.order_number}</h3>
+                      <p className="mt-1.5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-verde-600">
+                        <Clock className="h-3.5 w-3.5 text-oro-600" aria-hidden="true" />
                         {new Date(pedido.created_at).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' })}
-                        <span className="text-espresso-200">·</span>
-                        <span className="capitalize">{pedido.order_type}</span>
+                        <span className="inline-block h-1.5 w-1.5 rotate-45 bg-oro-400" aria-hidden="true" />
+                        <span className="text-[11px] font-medium uppercase tracking-[0.16em]">{pedido.order_type}</span>
                       </p>
                     </div>
-                    <StatusBadge status={pedido.status} />
+                    <StatusBadge status={pedido.status} className="shrink-0" />
                   </div>
 
                   {/* Items estilo ticket */}
-                  <div className="mx-6 flex-1 rounded-xl border border-dashed border-espresso-100 bg-cream/50 px-4 py-3">
+                  <div className="mx-6 flex-1 rounded-2xl border border-dashed border-oro-400/80 bg-crema/70 px-4 py-3">
                     {pedido.items && pedido.items.length > 0 ? (
                       <ul className="space-y-1.5 text-sm">
                         {pedido.items.map((item, idx) => (
-                          <li key={idx} className="flex justify-between gap-4 text-espresso-600">
-                            <span className="truncate">{item.menu_item_name}</span>
-                            <span className="shrink-0 text-espresso-400">×{item.quantity}</span>
+                          <li key={idx} className="flex items-baseline gap-2 text-verde-700">
+                            <span className="min-w-0 truncate">{item.menu_item_name}</span>
+                            <span className="mb-1 min-w-[1rem] flex-1 border-b border-dotted border-oro-400" aria-hidden="true" />
+                            <span className="shrink-0 font-serif italic text-verde-600">×{item.quantity}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-espresso-500">
+                      <p className="text-sm text-verde-600">
                         {pedido.items_count || 0} {pedido.items_count === 1 ? 'producto' : 'productos'}
                       </p>
                     )}
-                    <div className="mt-3 flex items-center justify-between border-t border-dashed border-espresso-100 pt-3">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-oro-400/80 pt-3">
                       {pedido.is_paid ? (
                         <Badge tone="sage">Pagado</Badge>
                       ) : (
                         <Badge tone="honey">Por cobrar</Badge>
                       )}
-                      <span className="font-serif text-2xl font-medium text-espresso-800">${pedido.total}</span>
+                      <span className="flex items-baseline gap-2">
+                        <span className="stat-label">Total</span>
+                        <span className="font-serif text-2xl italic font-medium text-verde-700">${pedido.total}</span>
+                      </span>
                     </div>
                   </div>
 
@@ -123,7 +127,7 @@ export const Pedidos = () => {
                     {pedido.status === 'pendiente' && (
                       <>
                         <Button size="sm" onClick={() => handleStatusChange(pedido.id, 'confirm')}>
-                          <Check className="h-4 w-4" />
+                          <Check className="h-4 w-4" aria-hidden="true" />
                           Confirmar
                         </Button>
                         <Button size="sm" variant="danger" onClick={() => handleStatusChange(pedido.id, 'cancel')}>
@@ -134,7 +138,7 @@ export const Pedidos = () => {
 
                     {pedido.status === 'confirmada' && (
                       <Button size="sm" variant="accent" onClick={() => handleStatusChange(pedido.id, 'send_to_kitchen')}>
-                        <ChefHat className="h-4 w-4" />
+                        <ChefHat className="h-4 w-4" aria-hidden="true" />
                         Enviar a cocina
                       </Button>
                     )}
@@ -153,7 +157,7 @@ export const Pedidos = () => {
 
                     {!pedido.is_paid && pedido.status === 'entregada' && (
                       <Button size="sm" onClick={() => handleStatusChange(pedido.id, 'mark_paid')}>
-                        <DollarSign className="h-4 w-4" />
+                        <DollarSign className="h-4 w-4" aria-hidden="true" />
                         Registrar pago
                       </Button>
                     )}

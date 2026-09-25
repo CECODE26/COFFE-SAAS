@@ -144,32 +144,32 @@
 }
 
 /* Documentos legales */
-.legal section + section {
+:where(.legal) section + section {
   margin-top: 3rem;
 }
-.legal h2 {
+:where(.legal) h2 {
   @apply mb-4 font-serif text-[1.7rem] italic font-medium text-verde-700;
 }
-.legal h3 {
+:where(.legal) h3 {
   @apply mb-2 mt-6 text-base font-semibold text-verde-700;
 }
 .legal p,
-.legal li {
+:where(.legal) li {
   @apply leading-relaxed text-verde-600;
 }
-.legal p + p {
+:where(.legal) p + p {
   margin-top: 0.9rem;
 }
-.legal ul {
+:where(.legal) ul {
   @apply my-4 list-disc space-y-2 pl-5 marker:text-oro-400;
 }
-.legal ol {
+:where(.legal) ol {
   @apply my-4 list-decimal space-y-2 pl-5 marker:text-oro-500;
 }
-.legal a {
+:where(.legal) a {
   @apply font-medium text-cobalto-500 underline decoration-oro-300 underline-offset-4 hover:decoration-cobalto-500;
 }
-.legal strong {
+:where(.legal) strong {
   @apply font-semibold text-verde-700;
 }
 

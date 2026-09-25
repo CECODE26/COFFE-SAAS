@@ -49,9 +49,9 @@ export const Toldo = ({ className = '' }) => {
     </div>
   );
   return (
-    <div className={`relative h-[59px] lg:h-[93px] ${className}`} aria-hidden="true">
-      <Variante w={48} h={66} bar={10} line={2} fh={28} suffix="d" visible="hidden lg:block" />
-      <Variante w={26} h={44} bar={7} line={1.5} fh={16} suffix="m" visible="lg:hidden" />
+    <div className={`relative h-[59px] min-[1100px]:h-[93px] ${className}`} aria-hidden="true">
+      <Variante w={48} h={66} bar={10} line={2} fh={28} suffix="d" visible="hidden min-[1100px]:block" />
+      <Variante w={26} h={44} bar={7} line={1.5} fh={16} suffix="m" visible="min-[1100px]:hidden" />
     </div>
   );
 };
@@ -111,11 +111,14 @@ export const Marca = ({ light = false, subtitulo = 'Gestión de cafeterías', cl
   </span>
 );
 
+const posicion = (className) => (/\b(absolute|fixed|sticky)\b/.test(className) ? '' : 'relative');
+
 // ---------- Sello azul giratorio con texto circular ----------
+// El texto circular admite ~33 caracteres con este tamaño; más largo, se superpone.
 export const SelloGiratorio = ({ texto = 'HECHO PARA CAFETERÍAS · ECUADOR ·', className = '', children }) => {
   const id = useSvgId();
   return (
-    <div className={`relative aspect-square ${className}`} aria-hidden="true">
+    <div className={`${posicion(className)} aspect-square ${className}`} aria-hidden="true">
       <svg className="giro-lento absolute inset-0 h-full w-full" viewBox="0 0 148 148">
         <defs>
           <path id={`${id}ring`} d="M74 74m-54 0a54 54 0 1 1 108 0a54 54 0 1 1 -108 0" />
@@ -231,7 +234,7 @@ export const TazaPorcelana = ({ className = '', detallada = true }) => {
 };
 
 // ---------- Vitrina en arco con foto, marco dorado y abanico ----------
-export const Vitrina = ({ src, alt = '', className = '', children, objectPosition = '53% 50%' }) => (
+export const Vitrina = ({ src, alt = '', className = '', imgClassName = '', children, objectPosition = '53% 50%' }) => (
   <div className={`relative aspect-[412/720] ${className}`}>
     <div className="absolute inset-0 rounded-arco border border-b-0 border-oro-400/70" aria-hidden="true" />
     <div
@@ -247,7 +250,7 @@ export const Vitrina = ({ src, alt = '', className = '', children, objectPositio
             <img
               src={src}
               alt={alt}
-              className="h-full w-full object-cover"
+              className={`h-full w-full object-cover ${imgClassName}`}
               style={{ objectPosition, filter: 'saturate(1.1) brightness(1.07) contrast(1.03) sepia(.06)' }}
             />
           )}
@@ -276,7 +279,7 @@ export const Vitrina = ({ src, alt = '', className = '', children, objectPositio
 
 // ---------- Cinta de etiqueta (tipo "La firma de la casa") ----------
 export const CintaFirma = ({ etiqueta, nombre, className = '' }) => (
-  <div className={`relative inline-flex ${className}`}>
+  <div className={`${posicion(className)} inline-flex ${className}`}>
     <span className="absolute -left-[18px] top-[6px] h-[30px] w-8 bg-pistacho-400" style={{ clipPath: 'polygon(0 0,100% 0,100% 100%,0 100%,10px 50%)' }} aria-hidden="true" />
     <span className="absolute -right-[18px] top-[6px] h-[30px] w-8 bg-pistacho-400" style={{ clipPath: 'polygon(0 0,100% 0,calc(100% - 10px) 50%,100% 100%,0 100%)' }} aria-hidden="true" />
     <span className="absolute left-0 top-[30px] h-1.5 w-3.5 bg-pistacho-500" style={{ clipPath: 'polygon(0 0,100% 0,100% 100%)' }} aria-hidden="true" />
@@ -290,10 +293,11 @@ export const CintaFirma = ({ etiqueta, nombre, className = '' }) => (
 
 // ---------- Cinta cobalto con texto que desfila ----------
 export const CintaCarta = ({ items, speed = 46, className = '' }) => {
-  const group = (hidden) => (
-    <ul className="m-0 flex list-none items-center gap-8 pr-8" aria-hidden={hidden || undefined}>
+  // Se repite para llenar el ancho; los lectores de pantalla solo leen la primera vuelta.
+  const group = (visibleGroup) => (
+    <ul className="m-0 flex list-none items-center gap-8 pr-8" aria-hidden={visibleGroup ? undefined : true} aria-label={visibleGroup ? 'Funciones' : undefined}>
       {[...items, ...items, ...items].map((t, i) => (
-        <li key={i} className="flex items-center gap-8 whitespace-nowrap">
+        <li key={i} className="flex items-center gap-8 whitespace-nowrap" aria-hidden={visibleGroup && i >= items.length ? true : undefined}>
           {t}
           <span className="inline-block h-2 w-2 rotate-45 scale-75 bg-oro-300" aria-hidden="true" />
         </li>
@@ -306,8 +310,8 @@ export const CintaCarta = ({ items, speed = 46, className = '' }) => {
       style={{ '--marquee-duration': `${speed}s` }}
     >
       <div className="marquee-track">
-        <div className="marquee-group">{group(false)}</div>
         <div className="marquee-group">{group(true)}</div>
+        <div className="marquee-group">{group(false)}</div>
       </div>
     </div>
   );

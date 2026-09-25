@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { EASE } from './Motion';
+import { Badge } from './StatusBadge';
 import { Coffee, Croissant, Sandwich, Check } from 'lucide-react';
 
 const MENU = [
   ['Flat White', Coffee, 3.1], ['Cappuccino', Coffee, 2.8], ['Croissant', Croissant, 2.2], ['Bolón mixto', Sandwich, 5.8],
   ['Cold Brew', Coffee, 3.2], ['Rol de canela', Croissant, 2.6], ['Tostada de aguacate', Sandwich, 6.5],
 ];
+// `rombo`: color del rombo que marca cada columna
 const COLS = [
-  { key: 0, title: 'Pendiente', hint: 'El camarero toma el pedido' },
-  { key: 1, title: 'Preparando', hint: 'Cocina y barra lo ven al instante' },
-  { key: 2, title: 'Listo', hint: 'Aviso para entregar' },
-  { key: 3, title: 'Cobrado', hint: 'Caja registra el pago' },
+  { key: 0, title: 'Pendiente', hint: 'El camarero toma el pedido', rombo: 'bg-oro-400' },
+  { key: 1, title: 'Preparando', hint: 'Cocina y barra lo ven al instante', rombo: 'bg-cobalto-500' },
+  { key: 2, title: 'Listo', hint: 'Aviso para entregar', rombo: 'bg-verde-500' },
+  { key: 3, title: 'Cobrado', hint: 'Caja registra el pago', rombo: 'bg-pistacho-400' },
 ];
 
 let uid = 1;
@@ -54,17 +56,25 @@ export const OrderFlowDemo = () => {
   }, [reduce]);
 
   return (
-    <div className="grid gap-3 md:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {COLS.map((col) => {
         const list = orders.filter((o) => o.status === col.key);
         return (
-          <div key={col.key} className="flex min-h-[260px] flex-col rounded-3xl border border-line bg-white/60 p-3">
-            <div className="mb-3 flex items-center justify-between px-1">
+          <div key={col.key} className="flex min-h-[260px] flex-col rounded-3xl border border-oro-200/80 bg-crema p-3">
+            <div className="mb-3 flex items-start justify-between gap-2 border-b border-oro-200/80 px-1 pb-3">
               <div>
-                <p className="font-display text-sm font-bold text-ink">{col.title}</p>
-                <p className="text-[11px] text-muted">{col.hint}</p>
+                <p className="flex items-center gap-2 font-serif text-lg font-medium italic leading-tight text-verde-700">
+                  <span className={`h-2 w-2 shrink-0 rotate-45 ${col.rombo}`} aria-hidden="true" />
+                  {col.title}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-verde-600">{col.hint}</p>
               </div>
-              <motion.span key={list.length} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="rounded-full bg-sheet px-2 py-0.5 text-xs font-semibold text-ink">
+              <motion.span
+                key={list.length}
+                initial={{ scale: 1.3 }}
+                animate={{ scale: 1 }}
+                className="flex h-7 min-w-[28px] shrink-0 items-center justify-center rounded-full border border-oro-300 bg-marfil px-2 text-xs font-medium text-verde-700"
+              >
                 {list.length}
               </motion.span>
             </div>
@@ -79,30 +89,32 @@ export const OrderFlowDemo = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ layout: { duration: 0.55, ease: EASE }, duration: 0.3 }}
-                    className={`card p-3 ${o.status === 3 ? 'opacity-70' : ''}`}
+                    className={`rounded-2xl border border-oro-200/80 p-3 shadow-soft ${o.status === 3 ? 'bg-pistacho-50' : 'bg-marfil'}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-clay-500">Mesa {o.mesa}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-cobalto-500">Mesa {o.mesa}</span>
                       {o.status === 3 ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700"><Check className="h-3 w-3" /> Pagado</span>
+                        <Badge tone="sage" dot={false}>
+                          <Check className="h-3 w-3" aria-hidden="true" /> Pagado
+                        </Badge>
                       ) : (
-                        <span className="text-[10px] text-muted">#{String(o.id).padStart(3, '0')}</span>
+                        <span className="text-[11px] text-verde-600">#{String(o.id).padStart(3, '0')}</span>
                       )}
                     </div>
-                    <ul className="mt-1.5 space-y-1">
+                    <ul className="mt-2 space-y-1">
                       {o.items.map(([name, Icon], i) => (
-                        <li key={i} className="flex items-center gap-2 text-xs text-ink">
-                          <Icon className="h-3.5 w-3.5 text-clay-500" /> {name}
+                        <li key={i} className="flex items-center gap-2 text-xs text-verde-800">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-cobalto-500" aria-hidden="true" /> {name}
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-2 flex items-center justify-between border-t border-line pt-1.5">
-                      <span className="text-[10px] text-muted">Total</span>
-                      <span className="font-display text-xs font-bold text-ink">${o.total.toFixed(2)}</span>
+                    <div className="mt-2 flex items-center justify-between border-t border-oro-200/80 pt-1.5">
+                      <span className="text-[11px] uppercase tracking-[0.14em] text-verde-600">Total</span>
+                      <span className="font-serif text-sm font-medium italic text-verde-700">${o.total.toFixed(2)}</span>
                     </div>
                     {o.status === 1 && (
-                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-sheet">
-                        <motion.div className="h-full bg-clay-600" initial={{ width: '10%' }} animate={{ width: '90%' }} transition={{ duration: 3, ease: 'linear' }} />
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-pistacho-100" aria-hidden="true">
+                        <motion.div className="h-full bg-oro-400" initial={{ width: '10%' }} animate={{ width: '90%' }} transition={{ duration: 3, ease: 'linear' }} />
                       </div>
                     )}
                   </motion.div>

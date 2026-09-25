@@ -3,42 +3,65 @@ import React from 'react';
 export const money = (n) =>
   `$${Number(n || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Tarjeta de métrica; `featured` la pinta en espresso
+// Aro dorado interior + sombra elevada para la tarjeta destacada
+const FEATURED_SHADOW =
+  'inset 0 0 0 4px #2A4520, inset 0 0 0 5px rgba(216, 180, 92, 0.75), 0 2px 4px rgba(42, 69, 32, 0.06), 0 16px 36px -12px rgba(42, 69, 32, 0.22)';
+
+// Tarjeta de métrica "Pistacho y oro": marfil con borde dorado; `featured` la pinta en verde bosque con aro de oro
 export const StatTile = ({ icon: Icon, label, value, hint, featured = false, delay = 0 }) => (
   <div
-    className={`animate-fade-in rounded-xl2 p-5 ${
-      featured ? 'bg-espresso-800 text-cream shadow-lift' : 'border border-espresso-100/70 bg-paper shadow-soft'
+    className={`animate-fade-in relative rounded-xl2 p-5 ${
+      featured ? 'bg-verde-700 text-marfil' : 'border border-oro-200/80 bg-marfil shadow-soft'
     }`}
-    style={{ animationDelay: `${delay}ms` }}
+    style={{ animationDelay: `${delay}ms`, ...(featured ? { boxShadow: FEATURED_SHADOW } : {}) }}
   >
-    <div className="flex items-center justify-between">
-      <p className={`text-xs font-medium uppercase tracking-wider ${featured ? 'text-espresso-200' : 'text-espresso-400'}`}>
+    <div className="flex items-center justify-between gap-2">
+      <p
+        className={`text-[11px] font-medium uppercase tracking-[0.18em] ${featured ? 'text-pistacho-200' : 'text-verde-600'}`}
+      >
         {label}
       </p>
-      {Icon && <Icon className={`h-4 w-4 ${featured ? 'text-brass-300' : 'text-brass-500'}`} />}
+      {Icon && (
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${
+            featured ? 'text-oro-300 ring-oro-300/60' : 'bg-pistacho-50 text-oro-600 ring-oro-300/70'
+          }`}
+          aria-hidden="true"
+        >
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+      )}
     </div>
-    <p className={`mt-4 font-serif text-4xl font-medium ${featured ? 'text-cream' : 'text-espresso-800'}`}>{value}</p>
-    {hint && <p className={`mt-1 text-xs ${featured ? 'text-espresso-300' : 'text-espresso-400'}`}>{hint}</p>}
+    <p
+      className={`mt-3 font-serif text-[1.65rem] italic font-medium leading-tight [overflow-wrap:anywhere] sm:text-4xl ${
+        featured ? 'text-marfil' : 'text-verde-700'
+      }`}
+    >
+      {value}
+    </p>
+    <span className={`mt-2 block h-px w-8 ${featured ? 'bg-oro-300/70' : 'bg-oro-300'}`} aria-hidden="true" />
+    {hint && <p className={`mt-2 text-xs ${featured ? 'text-verde-100' : 'text-verde-600'}`}>{hint}</p>}
   </div>
 );
 
-// Barra de uso "x de max"; se tiñe de terracota cuando se acerca al límite
+// Barra de uso "x de max": verde con holgura, oro cerca del límite y terracota al tope
 export const UsageBar = ({ value, max, className = '' }) => {
   const unlimited = max >= 999;
   const pct = unlimited ? Math.min(100, value * 2) : Math.min(100, (value / Math.max(max, 1)) * 100);
-  const tone = !unlimited && pct >= 90 ? 'bg-terracotta-600' : !unlimited && pct >= 70 ? 'bg-honey-600' : 'bg-brass-400';
+  const tone = !unlimited && pct >= 90 ? 'bg-terracotta-600' : !unlimited && pct >= 70 ? 'bg-oro-400' : 'bg-verde-500';
   return (
     <div className={className}>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-foam">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-pistacho-100 ring-1 ring-inset ring-oro-200/60">
         <div className={`h-full rounded-full ${tone} transition-all duration-700`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1 text-[11px] text-espresso-400">
+      <p className="mt-1 text-[11px] text-verde-600">
         {value} {unlimited ? '· ilimitado' : `de ${max}`}
       </p>
     </div>
   );
 };
 
+// Avatar con aro de oro e iniciales en Playfair cursiva; `dark` (admins) lo pinta en cobalto
 export const Avatar = ({ name = '?', dark = false, size = 'md' }) => {
   const initials = name
     .split(' ')
@@ -50,9 +73,10 @@ export const Avatar = ({ name = '?', dark = false, size = 'md' }) => {
   const sizes = { sm: 'h-8 w-8 text-xs', md: 'h-10 w-10 text-sm', lg: 'h-12 w-12 text-base' };
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full font-serif font-semibold ${sizes[size]} ${
-        dark ? 'bg-espresso-800 text-brass-300' : 'bg-foam text-espresso-600'
-      }`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-serif italic font-medium ring-1 ring-oro-400 ring-offset-1 ring-offset-marfil ${
+        sizes[size] || sizes.md
+      } ${dark ? 'bg-cobalto-500 text-marfil' : 'bg-pistacho-200 text-verde-800'}`}
+      aria-hidden="true"
     >
       {initials || '?'}
     </div>

@@ -22,13 +22,13 @@ const daysLeft = (date) => Math.ceil((new Date(date) - new Date()) / 86400000);
 
 const Plazo = ({ s }) => {
   if (!ABIERTAS.includes(s.estado)) {
-    return <span className="text-xs text-espresso-400">Resuelta {new Date(s.resuelta_at).toLocaleDateString('es-EC')}</span>;
+    return <span className="text-xs text-verde-600">Resuelta {new Date(s.resuelta_at).toLocaleDateString('es-EC')}</span>;
   }
   const d = daysLeft(s.fecha_limite);
   const tone = d < 0 ? 'terracotta' : d <= 3 ? 'honey' : 'neutral';
   return (
     <Badge tone={tone} dot={false}>
-      <Clock className="h-3 w-3" /> {d < 0 ? `Vencida hace ${-d} d` : d === 0 ? 'Vence hoy' : `${d} días`}
+      <Clock className="h-3 w-3" aria-hidden="true" /> {d < 0 ? `Vencida hace ${-d} d` : d === 0 ? 'Vence hoy' : `${d} días`}
     </Badge>
   );
 };
@@ -108,24 +108,24 @@ export const SolicitudesDatos = () => {
             />
           ) : (
             <Card padded={false}>
-              <ul className="divide-y divide-foam">
+              <ul className="divide-y divide-oro-200/60">
                 {filtered.map((s) => {
                   const [tone, label] = ESTADOS[s.estado];
                   return (
                     <li key={s.id}>
                       <button
                         onClick={() => open(s)}
-                        className="flex w-full flex-col gap-3 px-6 py-4 text-left transition-colors hover:bg-cream/40 sm:flex-row sm:items-center"
+                        className="flex w-full flex-col gap-3 px-5 py-4 text-left transition-colors hover:bg-pistacho-50 focus-visible:bg-pistacho-50 focus-visible:outline-offset-[-3px] sm:flex-row sm:items-center sm:px-6"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-espresso-400">{s.codigo}</span>
+                            <span className="font-mono text-xs text-verde-600">{s.codigo}</span>
                             <Badge tone="brass" dot={false}>{s.tipo_display}</Badge>
                           </div>
-                          <p className="mt-1 font-medium text-espresso-800">{s.nombre}</p>
-                          <p className="truncate text-sm text-espresso-400">{s.detalle}</p>
+                          <p className="mt-1 font-serif text-lg italic font-medium leading-snug text-verde-700">{s.nombre}</p>
+                          <p className="truncate text-sm text-verde-600">{s.detalle}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                           <Plazo s={s} />
                           <Badge tone={tone}>{label}</Badge>
                         </div>
@@ -137,10 +137,14 @@ export const SolicitudesDatos = () => {
             </Card>
           )}
 
-          <p className="mt-6 text-sm text-espresso-400">
+          <p className="mt-6 flex flex-wrap items-center gap-x-2 text-sm text-verde-600">
+            <span className="rombo" aria-hidden="true" />
             Formulario público:{' '}
-            <Link to="/legal/derechos" className="inline-flex items-center gap-1 font-medium text-brass-600 hover:underline">
-              /legal/derechos <ExternalLink className="h-3.5 w-3.5" />
+            <Link
+              to="/legal/derechos"
+              className="inline-flex items-center gap-1 font-medium text-cobalto-500 underline decoration-oro-400 underline-offset-4 transition-colors hover:text-verde-700"
+            >
+              /legal/derechos <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           </p>
         </>
@@ -150,9 +154,9 @@ export const SolicitudesDatos = () => {
         open={!!selected}
         onClose={() => setSelected(null)}
         size="lg"
-        eyebrow={selected?.codigo}
+        eyebrow="Solicitud de titular"
         title={selected?.tipo_display || ''}
-        subtitle={selected && `Recibida el ${new Date(selected.created_at).toLocaleString('es-EC', { dateStyle: 'long', timeStyle: 'short' })}`}
+        subtitle={selected && `${selected.codigo} · Recibida el ${new Date(selected.created_at).toLocaleString('es-EC', { dateStyle: 'long', timeStyle: 'short' })}`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setSelected(null)}>Cerrar</Button>
@@ -163,23 +167,41 @@ export const SolicitudesDatos = () => {
         {selected && (
           <div className="space-y-6">
             <FormAlert>{errors.general}</FormAlert>
-            <div className="grid gap-4 rounded-2xl border border-foam bg-cream/50 p-5 text-sm sm:grid-cols-2">
+            <div className="grid gap-4 rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 text-sm sm:grid-cols-2 sm:p-5">
               <div>
                 <p className="stat-label mb-1">Titular</p>
-                <p className="font-medium text-espresso-800">{selected.nombre}</p>
-                <p className="text-espresso-500">{selected.relacion_display}</p>
+                <p className="font-serif text-lg italic font-medium leading-snug text-verde-700">{selected.nombre}</p>
+                <p className="text-verde-600">{selected.relacion_display}</p>
               </div>
-              <div className="space-y-1 text-espresso-600">
-                <p className="flex items-center gap-2"><Contact className="h-4 w-4 text-brass-500" /> {selected.identificacion}</p>
-                <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-brass-500" /> <a href={`mailto:${selected.email}`} className="hover:underline">{selected.email}</a></p>
-                {selected.telefono && <p className="flex items-center gap-2"><Phone className="h-4 w-4 text-brass-500" /> {selected.telefono}</p>}
-                {selected.cafeteria && <p className="flex items-center gap-2"><Store className="h-4 w-4 text-brass-500" /> {selected.cafeteria}</p>}
+              <div className="min-w-0 space-y-1 text-verde-600">
+                <p className="flex items-center gap-2">
+                  <Contact className="h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" /> {selected.identificacion}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" />{' '}
+                  <a
+                    href={`mailto:${selected.email}`}
+                    className="min-w-0 break-all text-cobalto-500 underline decoration-oro-300 underline-offset-4 hover:decoration-cobalto-500"
+                  >
+                    {selected.email}
+                  </a>
+                </p>
+                {selected.telefono && (
+                  <p className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" /> {selected.telefono}
+                  </p>
+                )}
+                {selected.cafeteria && (
+                  <p className="flex items-center gap-2">
+                    <Store className="h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" /> {selected.cafeteria}
+                  </p>
+                )}
               </div>
             </div>
 
             <div>
               <p className="stat-label mb-2">Solicitud</p>
-              <p className="whitespace-pre-line leading-relaxed text-espresso-700">{selected.detalle}</p>
+              <p className="whitespace-pre-line leading-relaxed text-verde-700">{selected.detalle}</p>
               <div className="mt-3"><Plazo s={selected} /></div>
             </div>
 

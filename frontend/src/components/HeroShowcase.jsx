@@ -1,17 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Float, LiveNumber, EASE, useLayer } from './Motion';
+import { Badge } from './StatusBadge';
 import { Coffee, Croissant, Sandwich, TrendingUp } from 'lucide-react';
 
 const ITEMS = [
   ['Flat White', Coffee], ['Cappuccino', Coffee], ['Croissant', Croissant], ['Bolón mixto', Sandwich],
   ['Cold Brew', Coffee], ['Rol de canela', Croissant], ['Tostada de aguacate', Sandwich], ['V60 de origen', Coffee],
 ];
+// Estado -> [etiqueta, tono del Badge] (mismos tonos que el panel real)
 const STATUS = [
-  ['Pendiente', 'bg-amber-50 text-amber-700'],
-  ['Preparando', 'bg-caramel-300/30 text-clay-600'],
-  ['Listo', 'bg-emerald-50 text-emerald-700'],
+  ['Pendiente', 'honey'],
+  ['Preparando', 'brass'],
+  ['Listo', 'sage'],
 ];
+
+// Antetítulo en mayúsculas espaciadas, oro viejo
+const Etiqueta = ({ children }) => (
+  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-oro-600">{children}</p>
+);
+
+// Punto verde que "late" (indica datos en vivo)
+const PuntoVivo = () => (
+  <span className="relative flex h-2 w-2" aria-hidden="true">
+    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pistacho-400 opacity-75 motion-reduce:animate-none" />
+    <span className="relative inline-flex h-2 w-2 rounded-full bg-verde-500" />
+  </span>
+);
 
 let uid = 100;
 const mkOrder = () => {
@@ -40,15 +55,13 @@ const OrderStream = () => {
   }, [reduce]);
 
   return (
-    <div className="card w-64 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-clay-500">Cocina · en vivo</p>
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-        </span>
+    <div className="card h-full p-5">
+      <div className="mb-4 flex items-center justify-between border-b border-oro-200/80 pb-3">
+        <Etiqueta>Cocina · en vivo</Etiqueta>
+        <PuntoVivo />
       </div>
-      <ul className="space-y-2">
+      {/* Altura mínima para 4 pedidos: la tarjeta no salta al entrar o salir uno */}
+      <ul className="min-h-[196px] space-y-2.5">
         <AnimatePresence initial={false}>
           {orders.map((o) => {
             const [label, tone] = STATUS[o.status];
@@ -62,15 +75,17 @@ const OrderStream = () => {
                 transition={{ duration: 0.45, ease: EASE }}
                 className="flex items-center gap-3 overflow-hidden"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sheet text-clay-600">
-                  <o.Icon className="h-4 w-4" />
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-oro-200 bg-pistacho-100 text-verde-700">
+                  <o.Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink">{o.name} <span className="text-muted">×{o.qty}</span></span>
-                  <span className="text-[11px] text-muted">Mesa {o.mesa}</span>
+                  <span className="block truncate text-sm font-medium text-verde-800">
+                    {o.name} <span className="font-normal text-verde-600">×{o.qty}</span>
+                  </span>
+                  <span className="text-[11px] text-verde-600">Mesa {o.mesa}</span>
                 </span>
-                <motion.span key={label} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone}`}>
-                  {label}
+                <motion.span key={label} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="shrink-0">
+                  <Badge tone={tone}>{label}</Badge>
                 </motion.span>
               </motion.li>
             );
@@ -91,19 +106,19 @@ const SalesCard = () => {
     return () => clearInterval(t);
   }, [reduce]);
   return (
-    <div className="card w-56 p-4">
-      <div className="flex items-start justify-between">
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-clay-500">Ventas de hoy</p>
-          <p className="font-display text-2xl font-extrabold text-ink">
+          <Etiqueta>Ventas de hoy</Etiqueta>
+          <p className="mt-1 font-serif text-3xl font-medium italic text-verde-700">
             <LiveNumber start={412.5} step={[1.8, 6.5]} every={2600} prefix="$" decimals={2} />
           </p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-          <TrendingUp className="h-3 w-3" /> +18%
-        </span>
+        <Badge tone="sage" dot={false}>
+          <TrendingUp className="h-3 w-3" aria-hidden="true" /> +18%
+        </Badge>
       </div>
-      <div className="mt-3 flex h-12 items-end gap-1">
+      <div className="mt-4 flex h-14 items-end gap-1 border-b border-oro-200 pb-px" aria-hidden="true">
         {bars.map((h, i) => (
           <motion.div
             key={`${i}-${h}`}
@@ -111,7 +126,7 @@ const SalesCard = () => {
             initial={{ height: 0 }}
             animate={{ height: `${h}%` }}
             transition={{ duration: 0.6, ease: EASE }}
-            className={`flex-1 rounded-t ${i === bars.length - 1 ? 'bg-clay-600' : 'bg-caramel-300/70'}`}
+            className={`flex-1 rounded-t-sm ${i === bars.length - 1 ? 'bg-cobalto-500' : 'bg-pistacho-300'}`}
           />
         ))}
       </div>
@@ -132,42 +147,45 @@ const OccupancyCard = () => {
   const pct = occ / total;
   const C = 97.4;
   return (
-    <div className="card flex items-center gap-3 !rounded-2xl px-4 py-3">
-      <div className="relative h-11 w-11">
-        <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
-          <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e4dcd1" strokeWidth="4" />
+    <div className="card flex h-full items-center gap-4 p-5">
+      <div className="relative h-14 w-14 shrink-0">
+        <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90" aria-hidden="true">
+          <circle cx="18" cy="18" r="15.5" fill="none" stroke="#E7DDBF" strokeWidth="3.5" />
           <motion.circle
-            cx="18" cy="18" r="15.5" fill="none" stroke="#5c2b26" strokeWidth="4" strokeLinecap="round"
+            cx="18" cy="18" r="15.5" fill="none" stroke="#22409A" strokeWidth="3.5" strokeLinecap="round"
             strokeDasharray={C}
             animate={{ strokeDashoffset: C * (1 - pct) }}
             transition={{ duration: 0.8, ease: EASE }}
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-ink">{Math.round(pct * 100)}%</span>
+        <span className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-verde-700">{Math.round(pct * 100)}%</span>
       </div>
       <div>
-        <p className="text-xs text-muted">Ocupación ahora</p>
-        <p className="font-display text-sm font-bold text-ink">{occ} de {total} mesas</p>
+        <Etiqueta>Ocupación ahora</Etiqueta>
+        <p className="mt-0.5 font-serif text-xl font-medium italic text-verde-700">{occ} de {total} mesas</p>
       </div>
     </div>
   );
 };
 
-// Tarjetas flotantes en las esquinas del hero, alrededor de la tarjeta central (con parallax)
+// Tarjetas "en vivo" (ventas, ocupación y cocina) con flotación suave y parallax del mouse.
+// Se muestran como composición en la sección de demo: ventas y ocupación a un lado, cocina al otro.
 export const HeroShowcase = ({ parallax }) => {
-  const l1 = useLayer(parallax, 26);
-  const l2 = useLayer(parallax, 16);
-  const l3 = useLayer(parallax, 32);
+  const l1 = useLayer(parallax, 10);
+  const l2 = useLayer(parallax, 6);
+  const l3 = useLayer(parallax, 14);
   return (
-    <div className="pointer-events-none absolute inset-0 hidden lg:block">
-      <motion.div style={l1} className="absolute right-2 top-[10%] xl:right-0">
-        <Float amplitude={7} duration={5.5}><SalesCard /></Float>
-      </motion.div>
-      <motion.div style={l2} className="absolute bottom-[12%] left-2 xl:left-0">
-        <Float amplitude={9} duration={6} delay={0.5}><OrderStream /></Float>
-      </motion.div>
-      <motion.div style={l3} className="absolute bottom-[16%] right-4 xl:right-2">
-        <Float amplitude={6} duration={5} delay={1}><OccupancyCard /></Float>
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="flex flex-col gap-4">
+        <motion.div style={l1}>
+          <Float amplitude={4} duration={5.5}><SalesCard /></Float>
+        </motion.div>
+        <motion.div style={l3} className="flex-1">
+          <Float amplitude={3} duration={5} delay={1} className="h-full"><OccupancyCard /></Float>
+        </motion.div>
+      </div>
+      <motion.div style={l2}>
+        <Float amplitude={5} duration={6} delay={0.5} className="h-full"><OrderStream /></Float>
       </motion.div>
     </div>
   );

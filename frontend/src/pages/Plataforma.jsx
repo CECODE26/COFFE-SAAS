@@ -16,8 +16,18 @@ const TENANT_STATUS = {
   suspended: ['terracotta', 'Suspendido'],
 };
 
-const PLAN_TONE = { free: 'neutral', basic: 'slate', pro: 'brass', enterprise: 'honey' };
-const PLAN_COLOR = { free: '#d3bfad', basic: '#51707f', pro: '#cf9442', enterprise: '#2b1e16' };
+// Paleta "Pistacho y oro" por plan: pistacho, cobalto, oro y verde bosque
+const PLAN_TONE = { free: 'neutral', basic: 'slate', pro: 'brass', enterprise: 'sage' };
+const PLAN_COLOR = { free: '#BFD8A5', basic: '#22409A', pro: '#C39B45', enterprise: '#2A4520' };
+
+// Título de sección con antetítulo manuscrito
+const SectionTitle = ({ script, title, subtitle }) => (
+  <div>
+    {script && <p className="font-script text-[20px] leading-none text-oro-600">{script}</p>}
+    <h2 className="font-serif text-2xl italic font-medium text-verde-700">{title}</h2>
+    {subtitle && <p className="mt-0.5 text-sm text-verde-600">{subtitle}</p>}
+  </div>
+);
 
 export const Plataforma = () => {
   const [tenants, setTenants] = useState([]);
@@ -87,7 +97,7 @@ export const Plataforma = () => {
             subtitle="Distribuidores, planes y actividad de cada cafetería en COFFE-SAAS."
           />
 
-          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <StatTile featured icon={Network} label="Distribuidores" value={tenants.length} hint={`${activeTenants} activos`} />
             <StatTile icon={Store} label="Cafeterías" value={cafes.length} hint={`${cafes.filter((c) => c.is_active).length} abiertas`} delay={60} />
             <StatTile icon={Users} label="Usuarios" value={usersCount} hint="en toda la plataforma" delay={120} />
@@ -96,40 +106,39 @@ export const Plataforma = () => {
 
           {/* Distribuidores */}
           <Card padded={false} className="mb-6">
-            <div className="flex items-end justify-between p-6 pb-4">
-              <div>
-                <h2 className="text-2xl font-medium text-espresso-800">Distribuidores</h2>
-                <p className="text-sm text-espresso-400">Plan, límites de uso y estado de cada cuenta</p>
-              </div>
-              <Link to="/cafeterias" className="inline-flex items-center gap-1 text-sm font-medium text-brass-600 hover:text-brass-700">
-                Ver cafeterías <ArrowUpRight className="h-4 w-4" />
+            <div className="flex flex-wrap items-end justify-between gap-3 p-6 pb-4">
+              <SectionTitle script="La red" title="Distribuidores" subtitle="Plan, límites de uso y estado de cada cuenta" />
+              <Link to="/cafeterias" className="enlace gap-1.5">
+                Ver cafeterías <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-sm">
                 <thead>
-                  <tr className="border-y border-foam bg-cream/50 text-left text-[11px] uppercase tracking-wider text-espresso-400">
+                  <tr className="border-y border-oro-300/60 bg-crema/70 text-left text-[11px] uppercase tracking-[0.18em] text-verde-600">
                     <th className="px-6 py-3 font-medium">Distribuidor</th>
                     <th className="px-3 py-3 font-medium">Plan</th>
                     <th className="px-3 py-3 font-medium">Cafeterías</th>
                     <th className="px-3 py-3 font-medium">Usuarios</th>
                     <th className="px-3 py-3 text-right font-medium">Volumen</th>
                     <th className="px-3 py-3 font-medium">Estado</th>
-                    <th className="px-6 py-3" />
+                    <th className="px-6 py-3">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-foam">
+                <tbody className="divide-y divide-oro-200/60">
                   {tenants.map((t) => {
                     const [tone, label] = TENANT_STATUS[t.status] || TENANT_STATUS.inactive;
                     return (
-                      <tr key={t.id} className="transition-colors hover:bg-cream/40">
+                      <tr key={t.id} className="transition-colors hover:bg-pistacho-50">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <Avatar name={t.name} dark={t.status === 'active'} />
                             <div className="min-w-0">
-                              <p className="font-medium text-espresso-800">{t.name}</p>
-                              <p className="truncate text-xs text-espresso-400">{t.email}</p>
+                              <p className="font-medium text-verde-800">{t.name}</p>
+                              <p className="truncate text-xs text-verde-600">{t.email}</p>
                             </div>
                           </div>
                         </td>
@@ -142,7 +151,7 @@ export const Plataforma = () => {
                         <td className="w-36 px-3 py-4">
                           <UsageBar value={t.active_users_count} max={t.max_users} />
                         </td>
-                        <td className="px-3 py-4 text-right font-serif text-base text-espresso-800">
+                        <td className="px-3 py-4 text-right font-serif text-base italic text-verde-700">
                           {money(salesByTenant[t.id])}
                         </td>
                         <td className="px-3 py-4">
@@ -151,29 +160,35 @@ export const Plataforma = () => {
                         <td className="relative px-6 py-4 text-right">
                           <button
                             onClick={() => setOpenMenu(openMenu === t.id ? null : t.id)}
-                            className="rounded-full p-1.5 text-espresso-400 hover:bg-foam hover:text-espresso-800"
+                            className="rounded-full p-2 text-verde-600 ring-1 ring-transparent transition-colors hover:bg-pistacho-100 hover:text-cobalto-500 hover:ring-oro-200"
                             aria-label="Acciones"
+                            aria-expanded={openMenu === t.id}
                           >
-                            <MoreHorizontal className="h-5 w-5" />
+                            <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                           </button>
                           {openMenu === t.id && (
-                            <div className="animate-fade-in absolute right-6 top-12 z-20 w-52 rounded-2xl border border-espresso-100 bg-paper p-1.5 text-left shadow-lift">
+                            <div className="animate-fade-in absolute right-6 top-12 z-20 w-56 rounded-2xl border border-oro-300/70 bg-marfil p-1.5 text-left shadow-lift">
                               {t.status === 'active' ? (
                                 <button
                                   onClick={() => runAction(() => api.post(`/tenants/${t.id}/deactivate/`), `${t.name} desactivado`)}
-                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-terracotta-700 hover:bg-terracotta-100"
+                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-terracotta-700 transition-colors hover:bg-terracotta-100"
                                 >
-                                  <Power className="h-4 w-4" /> Desactivar
+                                  <Power className="h-4 w-4" aria-hidden="true" /> Desactivar
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => runAction(() => api.post(`/tenants/${t.id}/activate/`), `${t.name} activado`)}
-                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sage-700 hover:bg-sage-100"
+                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-verde-700 transition-colors hover:bg-pistacho-100"
                                 >
-                                  <Power className="h-4 w-4" /> Activar
+                                  <Power className="h-4 w-4" aria-hidden="true" /> Activar
                                 </button>
                               )}
-                              <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-espresso-300">
+                              <div className="mx-3 my-1.5 flex items-center gap-2" aria-hidden="true">
+                                <span className="h-px flex-1 bg-oro-300/70" />
+                                <span className="h-1.5 w-1.5 rotate-45 bg-oro-300" />
+                                <span className="h-px flex-1 bg-oro-300/70" />
+                              </div>
+                              <p className="px-3 pb-1 text-[10px] font-medium uppercase tracking-[0.22em] text-oro-600">
                                 Cambiar plan
                               </p>
                               {Object.entries(PLAN_LABELS).map(([plan, name]) => (
@@ -183,10 +198,19 @@ export const Plataforma = () => {
                                   onClick={() =>
                                     runAction(() => api.post(`/tenants/${t.id}/upgrade_plan/`, { plan }), `Plan ${name} asignado`)
                                   }
-                                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-espresso-700 hover:bg-foam disabled:cursor-default disabled:text-espresso-300 disabled:hover:bg-transparent"
+                                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-verde-700 transition-colors hover:bg-pistacho-50 hover:text-cobalto-500 disabled:cursor-default disabled:text-verde-500 disabled:hover:bg-transparent"
                                 >
-                                  {name}
-                                  {plan === t.plan && <span className="text-[10px] uppercase tracking-wider">actual</span>}
+                                  <span className="flex items-center gap-2.5">
+                                    <span
+                                      className="h-2 w-2 rotate-45 ring-1 ring-verde-400/40"
+                                      style={{ background: PLAN_COLOR[plan] }}
+                                      aria-hidden="true"
+                                    />
+                                    {name}
+                                  </span>
+                                  {plan === t.plan && (
+                                    <span className="text-[10px] uppercase tracking-[0.18em] text-cobalto-500">actual</span>
+                                  )}
                                 </button>
                               ))}
                             </div>
@@ -201,9 +225,10 @@ export const Plataforma = () => {
           </Card>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-            <Card className="lg:col-span-3">
-              <h2 className="text-2xl font-medium text-espresso-800">Volumen por distribuidor</h2>
-              <p className="mb-6 text-sm text-espresso-400">Pedidos no cancelados, en USD</p>
+            <Card className="min-w-0 lg:col-span-3">
+              <div className="mb-6">
+                <SectionTitle script="Cifras" title="Volumen por distribuidor" subtitle="Pedidos no cancelados, en USD" />
+              </div>
               <ResponsiveContainer width="100%" height={chartData.length * 52 + 10}>
                 <BarChart data={chartData} layout="vertical" barSize={22} margin={{ left: 0, right: 16 }}>
                   <XAxis type="number" hide />
@@ -213,18 +238,29 @@ export const Plataforma = () => {
                     width={150}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#6b4e3b', fontSize: 12 }}
+                    tick={{ fill: '#2A4520', fontSize: 12, fontFamily: 'Jost, sans-serif' }}
                   />
                   <Tooltip
-                    cursor={{ fill: '#f7f1e8' }}
-                    contentStyle={{ background: '#2b1e16', border: 'none', borderRadius: 12, fontSize: 13 }}
-                    itemStyle={{ color: '#f7f1e8' }}
-                    labelStyle={{ color: '#dcae64' }}
+                    cursor={{ fill: '#BFD8A5', fillOpacity: 0.25 }}
+                    contentStyle={{
+                      background: '#2A4520',
+                      border: '1px solid #C39B45',
+                      borderRadius: 14,
+                      fontSize: 13,
+                      fontFamily: 'Jost, sans-serif',
+                    }}
+                    itemStyle={{ color: '#FFFBF1' }}
+                    labelStyle={{ color: '#D8B45C', fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}
                     formatter={(v) => [money(v), 'Volumen']}
                   />
-                  <Bar dataKey="value" radius={[4, 10, 10, 4]}>
+                  <Bar dataKey="value" radius={[4, 12, 12, 4]}>
                     {chartData.map((d) => (
-                      <Cell key={d.name} fill={PLAN_COLOR[d.plan]} />
+                      <Cell
+                        key={d.name}
+                        fill={PLAN_COLOR[d.plan]}
+                        stroke={d.plan === 'free' ? '#7C9E5C' : undefined}
+                        strokeWidth={d.plan === 'free' ? 1 : 0}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -232,27 +268,33 @@ export const Plataforma = () => {
             </Card>
 
             <Card className="lg:col-span-2">
-              <h2 className="text-2xl font-medium text-espresso-800">Planes</h2>
-              <p className="mb-6 text-sm text-espresso-400">Cómo se reparten los distribuidores</p>
-              <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-foam">
+              <div className="mb-6">
+                <SectionTitle script="La carta" title="Planes" subtitle="Cómo se reparten los distribuidores" />
+              </div>
+              <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-pistacho-100 ring-1 ring-inset ring-oro-200/70">
                 {planCounts.map(({ plan, count }) =>
                   count ? (
                     <div
                       key={plan}
                       style={{ width: `${(count / tenants.length) * 100}%`, background: PLAN_COLOR[plan] }}
-                      className="border-r-2 border-paper last:border-r-0"
+                      className="border-r-2 border-marfil last:border-r-0"
                     />
                   ) : null
                 )}
               </div>
               <ul className="space-y-3">
                 {planCounts.map(({ plan, count }) => (
-                  <li key={plan} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2.5 text-espresso-600">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: PLAN_COLOR[plan] }} />
+                  <li key={plan} className="flex items-baseline text-sm">
+                    <span className="flex items-center gap-2.5 text-[12px] font-medium uppercase tracking-[0.16em] text-verde-600">
+                      <span
+                        className="h-2.5 w-2.5 rotate-45 ring-1 ring-verde-400/40"
+                        style={{ background: PLAN_COLOR[plan] }}
+                        aria-hidden="true"
+                      />
                       {PLAN_LABELS[plan]}
                     </span>
-                    <span className="font-serif text-lg text-espresso-800">{count}</span>
+                    <span className="mx-3 flex-1 border-b border-dotted border-oro-300" aria-hidden="true" />
+                    <span className="font-serif text-lg italic text-verde-700">{count}</span>
                   </li>
                 ))}
               </ul>

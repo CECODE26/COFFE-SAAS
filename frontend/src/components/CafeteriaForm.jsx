@@ -129,8 +129,11 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
           </Field>
         </div>
 
-        <div className="rounded-2xl border border-foam bg-cream/50 p-5">
-          <p className="mb-4 font-serif text-lg text-espresso-800">Capacidad y horario</p>
+        <div className="rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 sm:p-5">
+          <p className="mb-4 flex items-center gap-2.5 font-serif text-lg italic font-medium text-verde-700">
+            <span className="rombo" aria-hidden="true" />
+            Capacidad y horario
+          </p>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
             <Field label="Mesas" error={err('max_tables')}>
               <input className="input" type="number" min="1" value={form.max_tables} onChange={set('max_tables')} />
