@@ -95,8 +95,8 @@ services:
       <<: *django-env
       # Workers de gunicorn (regla habitual: 2 x núcleos + 1)
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+    # Sin montar la carpeta del código: corre exactamente lo que se construyó en la imagen
     volumes:
-      - .:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     depends_on:
@@ -140,7 +140,7 @@ services:
     environment:
       <<: *django-env
     volumes:
-      - .:/app
+      - media_volume:/app/media
     depends_on:
       - db
       - redis

@@ -1,0 +1,22 @@
+# Lo que NO entra en la imagen de Django (docker build .)
+# Importante: el .env del servidor tiene contraseñas y nunca debe quedar dentro de una imagen.
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.claude
+**/__pycache__
+**/*.pyc
+
+# El frontend se construye en su propia imagen (frontend/Dockerfile)
+frontend
+
+# Datos y artefactos del servidor
+media
+staticfiles
+backups
+*.log
+build.done
+docs

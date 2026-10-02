@@ -60,8 +60,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Docker
-.dockerignore
+# Docker (los .dockerignore SÍ se versionan: evitan que el .env del servidor entre en las imágenes)
 docker-compose.override.yml
 
 # Node (if using frontend tools)
@@ -72,3 +71,8 @@ yarn-error.log
 # Backup files
 *.bak
 *.tmp
+
+# Servidor: respaldos y estado del build (scripts/backup.sh, scripts/deploy.sh)
+/backups/
+build.log
+build.done

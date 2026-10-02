@@ -1,0 +1,10 @@
+# Lo que NO entra en el build del frontend (las dependencias se instalan dentro de la imagen)
+node_modules
+build
+npm-debug.log*
+
+# Las variables del build llegan por build args (docker-compose.yml); ningún .env local entra
+.env
+.env.local
+.env.*.local
+.env.development
