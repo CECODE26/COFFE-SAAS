@@ -62,7 +62,10 @@ class MenuItem(models.Model):
     price = models.DecimalField(_('Precio'), max_digits=10, decimal_places=2)
     cost = models.DecimalField(_('Costo'), max_digits=10, decimal_places=2, default=0)
 
+    # Foto procesada por apps.menu.imagenes (WebP sin EXIF, máx. 1200 px) y su miniatura (máx. 480 px).
+    # No asignar a mano: usar imagenes.aplicar_imagen() / quitar_imagen(), que borran los archivos anteriores.
     image = models.ImageField(_('Imagen'), upload_to='menu_items/', null=True, blank=True)
+    image_thumb = models.ImageField(_('Miniatura'), upload_to='menu_items/miniaturas/', null=True, blank=True)
 
     # Availability
     is_available = models.BooleanField(_('Disponible'), default=True)
@@ -96,6 +99,6 @@ class MenuItem(models.Model):
 
     def get_profit_margin(self):
         """Calcular margen de ganancia"""
-        if self.cost == 0:
+        if not self.cost or not self.price:
             return 0
         return ((self.price - self.cost) / self.price) * 100

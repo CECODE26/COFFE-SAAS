@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  AlertTriangle, BellRing, Check, DoorClosed, Hand, KeyRound, MessageSquare, QrCode, Receipt, RotateCw, Smartphone,
-  Sparkles, StickyNote, UserPlus, Users,
+  AlertTriangle, BellRing, Check, DoorClosed, Hand, KeyRound, MessageSquare, Pencil, QrCode, Receipt, RotateCw,
+  Smartphone, Sparkles, StickyNote, UserPlus, Users,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { Badge, StatusBadge } from '../StatusBadge';
@@ -43,7 +43,7 @@ const BotonFila = ({ children, ...props }) => (
 
 // Detalle de una mesa con comensales QR: cuentas pedidas, grupos con sus integrantes, cobros,
 // códigos de reconexión, solicitudes de unión, alertas y cierre de la mesa.
-export const DetalleMesa = ({ mesaId, mesa, onClose, onCambio, onVerQr, onMesaLista }) => {
+export const DetalleMesa = ({ mesaId, mesa, onClose, onCambio, onVerQr, onMesaLista, onEditar }) => {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -243,10 +243,19 @@ export const DetalleMesa = ({ mesaId, mesa, onClose, onCambio, onVerQr, onMesaLi
   } else {
     pie = (
       <>
-        <Button variant="secondary" size="sm" onClick={verQr} className="mr-auto">
-          <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
-          QR
-        </Button>
+        <span className="mr-auto flex items-center gap-1.5">
+          <Button variant="secondary" size="sm" onClick={verQr}>
+            <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+            QR
+          </Button>
+          {/* Solo roles de gestión (lo decide la página) */}
+          {onEditar && (
+            <Button variant="ghost" size="sm" onClick={onEditar} className="!px-3" aria-label={`Editar la mesa ${numero}`}>
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              Editar
+            </Button>
+          )}
+        </span>
         {estado === 'limpiando' && (
           <Button size="sm" onClick={mesaLista} disabled={liberando}>
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />

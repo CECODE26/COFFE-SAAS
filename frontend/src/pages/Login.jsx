@@ -6,11 +6,16 @@ import toast from 'react-hot-toast';
 import { ArrowRight, Globe2, Network, Store } from 'lucide-react';
 import { homeFor } from '../lib/roles';
 
-const DEMO_ACCOUNTS = [
-  { email: 'superadmin@coffe.com', password: 'admin123', label: 'Super Admin', hint: 'Toda la plataforma', icon: Globe2 },
-  { email: 'distribuidor@coffe.com', password: 'admin123', label: 'Distribuidor', hint: 'Andes Coffee Group', icon: Network },
-  { email: 'admin@coffe.com', password: 'admin', label: 'Cafetería', hint: 'Café La Floresta', icon: Store },
-];
+// Cuentas demo: solo en desarrollo (o en una demo pública con REACT_APP_CUENTAS_DEMO=true).
+// En el build de producción la condición es constante y el bloque (con sus contraseñas) no se incluye.
+const MOSTRAR_DEMO = process.env.NODE_ENV === 'development' || process.env.REACT_APP_CUENTAS_DEMO === 'true';
+const DEMO_ACCOUNTS = MOSTRAR_DEMO
+  ? [
+      { email: 'superadmin@coffe.com', password: 'admin123', label: 'Super Admin', hint: 'Toda la plataforma', icon: Globe2 },
+      { email: 'distribuidor@coffe.com', password: 'admin123', label: 'Distribuidor', hint: 'Andes Coffee Group', icon: Network },
+      { email: 'admin@coffe.com', password: 'admin', label: 'Cafetería', hint: 'Café La Floresta', icon: Store },
+    ]
+  : [];
 
 const CINTA = ['Mesas con QR', 'Pedidos en tiempo real', 'Carta digital', 'Reservas', 'Tu equipo'];
 
@@ -173,6 +178,7 @@ export const Login = () => {
               </button>
             </form>
 
+            {DEMO_ACCOUNTS.length > 0 && (
             <div className="mt-9">
               <p className="mb-3 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.2em] text-verde-600">
                 Cuentas demo
@@ -211,6 +217,7 @@ export const Login = () => {
                 })}
               </div>
             </div>
+            )}
           </div>
 
           <p className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">

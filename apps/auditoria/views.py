@@ -1,3 +1,5 @@
+import ipaddress
+
 from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
@@ -16,8 +18,14 @@ class SolicitudDatosPublicaView(generics.CreateAPIView):
     throttle_scope = 'solicitudes_datos'
 
     def perform_create(self, serializer):
-        forwarded = self.request.META.get('HTTP_X_FORWARDED_FOR', '')
-        ip = forwarded.split(',')[0].strip() or self.request.META.get('REMOTE_ADDR')
+        # Misma IP que usa el límite de DRF: con NUM_PROXIES toma la que agregó nuestro proxy,
+        # no el primer valor de X-Forwarded-For (ese lo puede inventar cualquiera)
+        ip = ScopedRateThrottle().get_ident(self.request)
+        try:
+            ip = str(ipaddress.ip_address(ip.strip()))
+        except (ValueError, AttributeError):
+            # Sin NUM_PROXIES, DRF puede devolver la cadena completa de X-Forwarded-For: usamos la conexión directa
+            ip = self.request.META.get('REMOTE_ADDR')
         serializer.save(ip=ip or None)
 
 

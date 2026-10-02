@@ -25,6 +25,8 @@ Los datos se generan alrededor de la hora actual (America/Guayaquil) para que to
     - Historial: 3 jornadas completas antes de hoy (DIAS_HISTORIAL), al mismo ritmo.
     - Distribuidores suspendidos/inactivos y locales cerrados: solo sus 2 últimas jornadas antes del
       cierre (DIAS_HISTORIAL_CERRADO) y su personal queda inactivo (el admin del distribuidor no).
+    - Fotos: si existe frontend/public/img/croissant.jpg, el «Croissant de mantequilla» de cada carta la
+      lleva (procesada como las que sube el dueño: WebP + miniatura). No se descarga nada de internet.
 """
 import random
 from collections import defaultdict
@@ -32,6 +34,8 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from itertools import product
 
+from django.conf import settings
+from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Sum
@@ -42,6 +46,7 @@ from apps.accounts.models import User
 from apps.auditoria.models import RegistroAuditoria, SolicitudDatos
 from apps.cafeterias.models import Cafeteria
 from apps.comensales.models import AlertaMesero, SesionCliente, SolicitudPago, SolicitudUnion
+from apps.menu.imagenes import ImagenInvalida, aplicar_imagen, procesar_imagen
 from apps.menu.models import Category, MenuItem
 from apps.mesas.models import Mesa, Reserva, generar_token_qr
 from apps.pedidos.models import Order, OrderItem
@@ -202,6 +207,11 @@ MENU = [
     ]),
 ]
 
+# Fotos reales de la carta demo (archivos en frontend/public/img; si no están, el producto queda sin foto)
+FOTOS_DEMO = {
+    'Croissant de mantequilla': 'croissant.jpg',
+}
+
 FIRST_NAMES = [
     'Sofía', 'Mateo', 'Valentina', 'Sebastián', 'Camila', 'Nicolás', 'Isabella', 'Diego', 'Martina',
     'Joaquín', 'Lucía', 'Andrés', 'Emilia', 'Gabriel', 'Paula', 'Tomás', 'Daniela', 'Santiago',
@@ -329,9 +339,19 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--reset', action='store_true', help='Borra los datos existentes antes de sembrar')
+        parser.add_argument(
+            '--permitir-produccion', action='store_true',
+            help='Permite correrlo con DEBUG=False (crea cuentas con contraseñas conocidas; --reset borra TODO)'
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
+        # En producción crearía cuentas con contraseñas públicas y --reset borraría los datos reales
+        if not settings.DEBUG and not options['permitir_produccion']:
+            raise CommandError(
+                'seed_demo es solo para desarrollo: con DEBUG=False no se ejecuta. '
+                'Si de verdad es un servidor de demostración, usa --permitir-produccion.'
+            )
         random.seed(42)
 
         if options['reset']:
@@ -358,6 +378,8 @@ class Command(BaseCommand):
         self.principal = None
         # Ex empleados con cuenta desactivada: (nombre, apellido) -> (usuario, fecha de baja)
         self.exequipo = {}
+        # Fotos demo: nombre del producto -> ImagenProcesada (se procesa una vez; cada producto guarda su copia)
+        self.fotos_demo = self._cargar_fotos_demo()
 
         superadmin = User.objects.create_superuser(
             email='superadmin@coffe.com', password=PASSWORD,
@@ -462,7 +484,7 @@ class Command(BaseCommand):
                 address=info['direccion'], phone=self._celular(),
                 email=f"{slugify(info['nombre'])}@{tenant.slug}.ec",
                 open_time=_hora(info['abre']), close_time=_hora(info['cierra']),
-                max_tables=12, is_active=cierre is None,
+                is_active=cierre is None,
             )
             extra = {'updated_at': self._a_las(cierre, time(19, 0))} if cierre else {}
             self._fechar(Cafeteria, cafe.pk, alta_cafe, **extra)
@@ -503,9 +525,26 @@ class Command(BaseCommand):
                     price=price, cost=(price * Decimal('0.35')).quantize(Decimal('0.01')),
                     preparation_time=prep, **flags,
                 ))
+        for item in items:
+            if item.name in self.fotos_demo:
+                aplicar_imagen(item, self.fotos_demo[item.name])
         Category.objects.filter(tenant=tenant).update(created_at=alta)
         MenuItem.objects.filter(tenant=tenant).update(created_at=alta)
         return items
+
+    def _cargar_fotos_demo(self):
+        """Fotos locales del frontend para la carta demo, procesadas con el mismo servicio que las del dueño"""
+        fotos = {}
+        for producto, archivo in FOTOS_DEMO.items():
+            ruta = settings.BASE_DIR / 'frontend' / 'public' / 'img' / archivo
+            if not ruta.exists():
+                continue
+            with ruta.open('rb') as f:
+                try:
+                    fotos[producto] = procesar_imagen(File(f, name=archivo))
+                except ImagenInvalida as error:
+                    self.stdout.write(self.style.WARNING(f'No se pudo usar {ruta}: {error}'))
+        return fotos
 
     def _create_staff(self, ctx):
         tenant, cafe = ctx['tenant'], ctx['cafe']

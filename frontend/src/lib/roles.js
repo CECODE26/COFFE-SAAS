@@ -41,7 +41,8 @@ export const navFor = (role) => {
           { path: '/solicitudes-datos', label: 'Privacidad', icon: ShieldCheck },
         ],
       },
-      { title: 'Operación global', links: [OPERACION[2], OPERACION[4]] },
+      // Mesas y Menú: el super_admin también los gestiona (elige el local o el distribuidor en cada página)
+      { title: 'Operación global', links: OPERACION.slice(1) },
     ];
   }
   if (role === 'distribuidor_admin') {

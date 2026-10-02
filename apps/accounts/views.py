@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -20,6 +21,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     """Login con email y password"""
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    # Frena intentos de adivinar contraseñas (por IP real, con NUM_PROXIES)
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
@@ -37,6 +41,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class DistribuidorRegistrationView(views.APIView):
     """Registro de nuevo Distribuidor"""
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'registro'
 
     def post(self, request):
         serializer = DistribuidorRegistrationSerializer(data=request.data)

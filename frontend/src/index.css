@@ -224,6 +224,44 @@
   .toldo-faldon { animation: ondear 5.5s ease-in-out infinite; }
 }
 
+/* ---------- Historia de bienvenida (QR) ----------
+ * Una pantalla de 5 s al estilo de las historias de Instagram (HistoriaBienvenida.jsx), que espera a los datos.
+ * El tiempo lo lleva la barra: animación de transform pausable con animation-play-state; al terminar
+ * (animationend) pasa a la bienvenida. El vapor lo pinta HumoParticulas en su propio canvas
+ * (con movimiento reducido deja un único cuadro quieto).
+ */
+@keyframes historia-progreso {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+/* Indica el tiempo: corre también con movimiento reducido */
+.historia-progreso {
+  transform-origin: left center;
+  animation: historia-progreso var(--historia-ms, 5s) linear forwards;
+}
+@keyframes historia-aparece {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Se monta cuando llegan los datos (solo opacidad); un QR inválido nunca la monta */
+.historia-aparece { animation: historia-aparece 0.22s ease-out backwards; }
+/* Aviso de carga sobre el papel crema: solo se ve si la espera se alarga (sin parpadeo en redes rápidas) */
+.historia-espera { animation: historia-aparece 0.3s ease-out 0.45s backwards; }
+@keyframes historia-acerca {
+  from { transform: scale(0.97); }
+  to { transform: none; }
+}
+/* Hueco de la taza: la taza (5:7) toma el alto libre sin pasarse del ancho ni de 400 px */
+.historia-taza-hueco { container-type: size; }
+.historia-taza-tam { height: min(100%, 400px); max-width: 100%; }
+@supports (height: 1cqh) {
+  .historia-taza-tam { height: min(100cqh, 140cqw, 400px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .historia-acerca { animation: historia-acerca 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+}
+
 /* ---------- Scrollbar ---------- */
 ::-webkit-scrollbar {
   width: 10px;

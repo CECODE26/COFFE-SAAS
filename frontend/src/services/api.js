@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+// Dirección del API (se fija al compilar; CRA incrusta las REACT_APP_* en el build):
+//   1. REACT_APP_API_URL si está definida (p. ej. https://api.midominio.com/api/v1).
+//   2. En desarrollo (npm start): el backend local en el puerto 8000.
+//   3. En producción: la ruta relativa /api/v1, es decir, el mismo dominio que sirve la web.
+// En el build de producción la rama de desarrollo se elimina, así que no queda ningún "localhost".
+const API_POR_DEFECTO = process.env.NODE_ENV === 'development' ? 'http://localhost:8000/api/v1' : '/api/v1';
+export const API_BASE_URL = (process.env.REACT_APP_API_URL || API_POR_DEFECTO).replace(/\/+$/, '');
 
 // Create axios instance
 const api = axios.create({

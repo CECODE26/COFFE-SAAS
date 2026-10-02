@@ -15,6 +15,15 @@ RUN npm install --legacy-peer-deps
 # Copy app source
 COPY . .
 
+# Variables del build (CRA las incrusta en el JS; vienen de docker-compose.yml -> build.args).
+# REACT_APP_API_URL vacío = el API está en el mismo dominio bajo /api/v1 (sin localhost).
+ARG REACT_APP_API_URL=
+ARG REACT_APP_PUBLIC_URL=
+ENV REACT_APP_API_URL=$REACT_APP_API_URL \
+    REACT_APP_PUBLIC_URL=$REACT_APP_PUBLIC_URL
+# Sin source maps (.map): no se publica el código fuente original con sus comentarios
+ENV GENERATE_SOURCEMAP=false
+
 # Build the app
 RUN npm run build
 

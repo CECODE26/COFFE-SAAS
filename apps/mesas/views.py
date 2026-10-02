@@ -1,30 +1,33 @@
+import uuid
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.utils import timezone
-from django.db import transaction
-from django.db.models import Q, Count, Sum, ProtectedError
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Count, Sum, Max, ProtectedError
 
 from .models import Mesa, Reserva, generar_token_qr
 from .serializers import (
-    MesaListSerializer, MesaDetailSerializer, MesaCreateUpdateSerializer,
+    MesaListSerializer, MesaDetailSerializer, MesaGestionSerializer, MesaCreateSerializer,
     MesaStatusChangeSerializer, MesaStatsSerializer,
     ReservaListSerializer, ReservaDetailSerializer, ReservaCreateSerializer,
-    ReservaUpdateSerializer
+    ReservaUpdateSerializer, ROLES_GESTION_LOCAL, mesas_activas_de,
 )
-from apps.accounts.permissions import IsTenantMember, IsCafeUser, IsDistribuidorAdmin
+from apps.accounts.permissions import IsTenantMember, IsCafeUser
 from apps.auditoria.services import registrar
+from apps.cafeterias.models import Cafeteria
 from apps.comensales.models import SesionCliente
 
 
 class IsAdminMesas(BasePermission):
     """
-    Administradores que pueden regenerar el QR de una mesa: cafe_admin, gerente,
-    distribuidor_admin y super_admin. El alcance (su local / su tenant) lo da
+    Quienes gestionan las mesas (crear, editar, desactivar/reactivar, borrar, regenerar el QR):
+    cafe_admin, gerente, distribuidor_admin y super_admin. El alcance (su local / su tenant) lo da
     MesaViewSet.get_queryset (get_object() devuelve 404 fuera de él).
     """
-    message = "Solo los administradores del local pueden regenerar el QR de una mesa."
+    message = "Solo el administrador o el gerente del local pueden gestionar las mesas."
     ROLES = ['cafe_admin', 'gerente', 'distribuidor_admin', 'super_admin']
 
     def has_permission(self, request, view):
@@ -32,14 +35,23 @@ class IsAdminMesas(BasePermission):
         return bool(user and user.is_authenticated and user.role in self.ROLES)
 
 
+def _es_verdadero(valor):
+    return str(valor).strip().lower() in ('1', 'true', 'si', 'sí', 'on')
+
+
+def _error(mensaje):
+    return Response({'error': mensaje}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class IsPersonalReservas(BasePermission):
     """
-    Personal que puede confirmar/cancelar reservas: el staff del local
+    Personal que puede crear, confirmar o cancelar reservas: el staff del local
     (cafe_admin, gerente, camarero, cajero, cocinero), distribuidor_admin y super_admin.
     Los clientes (rol 'usuario') quedan fuera. El alcance por local/tenant lo
-    da ReservaViewSet.get_queryset (get_object() devuelve 404 fuera de él).
+    da ReservaViewSet.get_queryset (get_object() devuelve 404 fuera de él) y, al crear,
+    el queryset de 'mesa' de ReservaCreateSerializer.
     """
-    message = "Solo el personal del local puede confirmar o cancelar reservas."
+    message = "Solo el personal del local puede gestionar las reservas."
     ROLES_LOCAL = ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero']
 
     def has_permission(self, request, view):
@@ -61,21 +73,48 @@ class MesaViewSet(viewsets.ModelViewSet):
     # 'id' desempata si dos locales tuvieran el mismo nombre.
     ordering = ['cafeteria__name', 'number', 'id']
 
+    # Acciones que solo hacen quienes gestionan las mesas (IsAdminMesas)
+    ACCIONES_GESTION = [
+        'create', 'update', 'partial_update', 'destroy',
+        'regenerar_qr', 'desactivar', 'reactivar', 'siguiente_numero',
+    ]
+    # Listados/lecturas de operación: solo mesas activas (el listado admite ?incluir_inactivas=1 para gestión)
+    ACCIONES_SOLO_ACTIVAS = ['list', 'available', 'occupied', 'stats', 'by_qr']
+
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return MesaDetailSerializer
-        elif self.action in ['create', 'update', 'partial_update']:
-            return MesaCreateUpdateSerializer
+        elif self.action == 'create':
+            return MesaCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return MesaGestionSerializer
         return MesaListSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAuthenticated(), IsDistribuidorAdmin()]
+        if self.action in self.ACCIONES_GESTION:
+            return [IsAuthenticated(), IsAdminMesas()]
         elif self.action in ['occupy', 'free', 'cleaning', 'change_status']:
             return [IsAuthenticated(), IsCafeUser()]
-        elif self.action == 'regenerar_qr':
-            return [IsAuthenticated(), IsAdminMesas()]
         return [IsAuthenticated(), IsTenantMember()]
+
+    def _gestiona_mesas(self):
+        return self.request.user.role in IsAdminMesas.ROLES
+
+    def _parametro_de_gestion(self, nombre):
+        """Parámetros del listado que solo usan quienes gestionan mesas (para el resto se ignoran)"""
+        return (
+            self.action == 'list'
+            and self._gestiona_mesas()
+            and _es_verdadero(self.request.query_params.get(nombre, ''))
+        )
+
+    def _incluir_inactivas(self):
+        """?incluir_inactivas=1: el listado trae también las desactivadas"""
+        return self._parametro_de_gestion('incluir_inactivas')
+
+    def _solo_inactivas(self):
+        """?solo_inactivas=1: el listado trae solo las desactivadas (filtro «Desactivadas» del panel)"""
+        return self._parametro_de_gestion('solo_inactivas')
 
     def get_queryset(self):
         """Filtrar mesas por cafetería del usuario"""
@@ -96,24 +135,250 @@ class MesaViewSet(viewsets.ModelViewSet):
         # Aplica también a super_admin. Las reservas de esos locales siguen en ReservaViewSet.
         queryset = queryset.filter(cafeteria__is_active=True)
 
+        # Las mesas desactivadas no forman parte de la operación (listados, stats, by_qr). Las acciones
+        # de detalle sí las encuentran (editar, reactivar, ver): así se pueden gestionar.
+        if self._solo_inactivas():
+            queryset = queryset.filter(is_active=False)
+        elif self.action in self.ACCIONES_SOLO_ACTIVAS and not self._incluir_inactivas():
+            queryset = queryset.filter(is_active=True)
+
         # Orden estable también para las acciones que no pasan por OrderingFilter
         return queryset.select_related('cafeteria', 'current_order').order_by(
             'cafeteria__name', 'number', 'id'
         )
 
-    def perform_create(self, serializer):
-        """Crear mesa"""
-        serializer.save()
+    # ---- Gestión (crear / editar / borrar / desactivar / reactivar) ----
 
-    def destroy(self, request, *args, **kwargs):
-        """Borrar mesa. Una mesa con historial de pedidos por QR (sesiones o cuentas) no se borra: se desactiva."""
+    def create(self, request, *args, **kwargs):
+        """Crear mesa: el QR se genera aquí. Responde con la fila de la grilla (MesaListSerializer)"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         try:
-            return super().destroy(request, *args, **kwargs)
-        except ProtectedError:
+            with transaction.atomic():
+                mesa = serializer.save()
+                registrar(
+                    request.user, 'mesa.crear', mesa,
+                    numero=mesa.number, cafeteria=mesa.cafeteria.name
+                )
+        except IntegrityError:
+            # Otra persona creó la misma mesa a la vez (el bloqueo del local lo hace casi imposible)
             return Response(
-                {'error': 'La mesa tiene historial de pedidos por QR: desactívala en vez de borrarla.'},
+                {'number': [f"Ya existe la mesa {serializer.validated_data['number']} en este local."]},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        return Response(MesaListSerializer(mesa).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """Editar número, capacidad, zona o descripción. Desactivar/reactivar va por sus propias acciones."""
+        partial = kwargs.pop('partial', False)
+        mesa = self.get_object()
+
+        if 'is_active' in request.data and _es_verdadero(request.data.get('is_active')) != mesa.is_active:
+            return Response(
+                {'is_active': ['Para desactivar o reactivar la mesa usa sus botones (desactivar / reactivar).']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(mesa, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        campos = ['number', 'capacity', 'min_capacity', 'location', 'description']
+        antes = {campo: getattr(mesa, campo) for campo in campos}
+        mesa = serializer.save()
+        cambios = {
+            campo: [antes[campo], getattr(mesa, campo)]
+            for campo in campos if antes[campo] != getattr(mesa, campo)
+        }
+        if cambios:
+            registrar(
+                request.user, 'mesa.editar', mesa,
+                numero=mesa.number, cafeteria=mesa.cafeteria.name, cambios=cambios
+            )
+        return Response(MesaListSerializer(mesa).data)
+
+    def _historial_de(self, mesa):
+        """Qué historial tiene la mesa (lista vacía si nunca se usó): pedidos, clientes por QR, cuentas o reservas"""
+        historial = []
+        if mesa.orders.exists():
+            historial.append('pedidos')
+        if mesa.sesiones_cliente.exists():
+            historial.append('clientes por QR')
+        if mesa.solicitudes_pago.exists():
+            historial.append('cuentas cobradas')
+        if mesa.reservas.exists():
+            historial.append('reservas')
+        return historial
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Borrar mesa. Solo si nunca se usó: con historial (pedidos, clientes por QR o reservas)
+        se desactiva en vez de borrarla, para no perder ese historial.
+        """
+        mesa = self.get_object()
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            historial = self._historial_de(mesa)
+            if historial:
+                que = historial[0] if len(historial) == 1 else f"{', '.join(historial[:-1])} y {historial[-1]}"
+                return _error(
+                    f'La mesa {mesa.number} ya tuvo {que}: desactívala en vez de borrarla '
+                    f'(así no se pierde ese historial).'
+                )
+            if mesa.status == 'ocupada':
+                return _error(f'La mesa {mesa.number} está ocupada: libérala antes de borrarla.')
+            try:
+                with transaction.atomic():
+                    registrar(
+                        request.user, 'mesa.borrar', mesa,
+                        numero=mesa.number, cafeteria=mesa.cafeteria.name
+                    )
+                    mesa.delete()
+            except ProtectedError:
+                return _error(
+                    f'La mesa {mesa.number} tiene historial de pedidos por QR: desactívala en vez de borrarla.'
+                )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _bloqueo_para_desactivar(self, mesa):
+        """(Mesa bloqueada) 400 si la mesa está en uso: ocupada, gente por QR, pedidos abiertos o reservas"""
+        if mesa.status == 'ocupada':
+            return _error(f'La mesa {mesa.number} está ocupada: libérala antes de desactivarla.')
+
+        conectadas = SesionCliente.objects.filter(mesa=mesa, estado='activa').count()
+        if conectadas:
+            return _error(
+                f'La mesa {mesa.number} tiene {conectadas} persona(s) conectadas por QR: '
+                f'cóbralas o ciérralas antes de desactivarla.'
+            )
+
+        from apps.comensales.services import pedidos_de_mesa_abiertos
+        abierto = pedidos_de_mesa_abiertos(mesa).order_by('created_at').first()
+        if abierto is not None:
+            que_hacer = 'cóbralo' if abierto.status == 'entregada' else 'cóbralo o cancélalo'
+            return _error(
+                f'La mesa {mesa.number} tiene el pedido {abierto.order_number} abierto: '
+                f'{que_hacer} antes de desactivarla.'
+            )
+
+        reservas = mesa.reservas.filter(
+            status__in=['pendiente', 'confirmada'], reservation_date__gte=timezone.localdate()
+        ).count()
+        if reservas:
+            return _error(
+                f'La mesa {mesa.number} tiene {reservas} reserva(s) pendientes: '
+                f'cancélalas o cámbialas de mesa antes de desactivarla.'
+            )
+        return None
+
+    @action(detail=True, methods=['post'])
+    def desactivar(self, request, pk=None):
+        """
+        Desactivar la mesa (en vez de borrarla): deja de listarse y su QR muestra "Escanea el QR de tu mesa".
+        No se puede con la mesa en uso. Se conserva todo su historial y el mismo QR para cuando se reactive.
+        """
+        mesa = self.get_object()
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            if not mesa.is_active:
+                return _error(f'La mesa {mesa.number} ya está desactivada.')
+            bloqueo = self._bloqueo_para_desactivar(mesa)
+            if bloqueo:
+                return bloqueo
+
+            # Las sesiones QR ya cobradas (viendo su ticket) se cierran y la mesa queda limpia para cuando vuelva
+            from apps.comensales.services import cerrar_sesiones_pagadas
+            cerrar_sesiones_pagadas(mesa)
+            if mesa.status != 'mantenimiento':
+                mesa.status = 'disponible'
+            mesa.guest_count = 0
+            mesa.occupied_since = None
+            mesa.current_order = None
+            mesa.nota_cierre = ''
+            mesa.is_active = False
+            mesa.save()
+            registrar(
+                request.user, 'mesa.desactivar', mesa,
+                numero=mesa.number, cafeteria=mesa.cafeteria.name
+            )
+
+        return Response(
+            {
+                'status': 'success',
+                'message': f'Mesa {mesa.number} desactivada: su QR deja de funcionar hasta que la reactives.',
+                'mesa': MesaListSerializer(mesa).data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def reactivar(self, request, pk=None):
+        """Reactivar una mesa desactivada. Su QR vuelve a servir."""
+        mesa = self.get_object()
+        with transaction.atomic():
+            mesa = self._mesa_bloqueada(mesa)
+            if mesa.is_active:
+                return _error(f'La mesa {mesa.number} ya está activa.')
+
+            mesa.is_active = True
+            mesa.save(update_fields=['is_active', 'updated_at'])
+            registrar(
+                request.user, 'mesa.reactivar', mesa,
+                numero=mesa.number, cafeteria=mesa.cafeteria.name
+            )
+
+        return Response(
+            {
+                'status': 'success',
+                'message': f'Mesa {mesa.number} reactivada: su QR vuelve a funcionar.',
+                'mesa': MesaListSerializer(mesa).data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def _cafeteria_para_gestion(self, request):
+        """
+        Local sobre el que se gestiona (siguiente_numero). cafe_admin/gerente: el suyo (se ignora el
+        parámetro). distribuidor: uno abierto de su tenant. super_admin: cualquiera abierto. Fuera → None (404).
+        """
+        user = request.user
+        if user.role in ROLES_GESTION_LOCAL:
+            cafeteria = user.cafeteria
+            return cafeteria if cafeteria is not None and cafeteria.is_active else None
+
+        try:
+            cafeteria_id = uuid.UUID(str(request.query_params.get('cafeteria', '')).strip())
+        except ValueError:
+            return None
+        locales = Cafeteria.objects.filter(is_active=True)
+        if user.role != 'super_admin':
+            locales = locales.filter(tenant_id=user.tenant_id)
+        return locales.filter(pk=cafeteria_id).first()
+
+    @action(detail=False, methods=['get'])
+    def siguiente_numero(self, request):
+        """Número sugerido para una mesa nueva (el mayor del local + 1, contando las desactivadas)"""
+        user = request.user
+        if user.role not in ROLES_GESTION_LOCAL and not request.query_params.get('cafeteria'):
+            return _error('Indica el local (?cafeteria=<id>).')
+
+        cafeteria = self._cafeteria_para_gestion(request)
+        if cafeteria is None:
+            return Response({'error': 'Local no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        mayor = Mesa.objects.filter(cafeteria=cafeteria).aggregate(mayor=Max('number'))['mayor'] or 0
+        return Response({
+            'numero': mayor + 1,
+            'cafeteria': str(cafeteria.pk),
+            'cafeteria_name': cafeteria.name,
+            'mesas_activas': mesas_activas_de(cafeteria),
+        })
+
+    # ---- Operación (ocupar / liberar / estados) ----
+
+    def _bloqueo_por_inactiva(self, mesa):
+        """Una mesa desactivada no se ocupa ni cambia de estado: primero hay que reactivarla"""
+        if not mesa.is_active:
+            return _error(f'La mesa {mesa.number} está desactivada: reactívala para usarla.')
+        return None
 
     def _cerrar_pagadas_al_ocupar(self, mesa):
         """
@@ -172,6 +437,9 @@ class MesaViewSet(viewsets.ModelViewSet):
     def occupy(self, request, pk=None):
         """Marcar mesa como ocupada"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_inactiva(mesa)
+        if bloqueo:
+            return bloqueo
         guest_count = request.data.get('guest_count', 1)
 
         try:
@@ -240,6 +508,9 @@ class MesaViewSet(viewsets.ModelViewSet):
     def cleaning(self, request, pk=None):
         """Marcar mesa como en limpieza"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_inactiva(mesa)
+        if bloqueo:
+            return bloqueo
         with transaction.atomic():
             mesa = self._mesa_bloqueada(mesa)
             bloqueo = self._bloqueo_por_pedido_abierto(mesa)
@@ -260,6 +531,9 @@ class MesaViewSet(viewsets.ModelViewSet):
     def maintenance(self, request, pk=None):
         """Marcar mesa como en mantenimiento"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_inactiva(mesa)
+        if bloqueo:
+            return bloqueo
         with transaction.atomic():
             mesa = self._mesa_bloqueada(mesa)
             bloqueo = self._bloqueo_por_pedido_abierto(mesa)
@@ -280,6 +554,9 @@ class MesaViewSet(viewsets.ModelViewSet):
     def change_status(self, request, pk=None):
         """Cambiar estado de mesa"""
         mesa = self.get_object()
+        bloqueo = self._bloqueo_por_inactiva(mesa)
+        if bloqueo:
+            return bloqueo
         serializer = MesaStatusChangeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -444,9 +721,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         return ReservaListSerializer
 
     def get_permissions(self):
-        if self.action in ['create']:
-            return [IsAuthenticated()]
-        elif self.action in ['confirm', 'cancel']:
+        if self.action in ['create', 'confirm', 'cancel']:
             # Personal del local, distribuidor_admin o super_admin. get_queryset ya limita
             # a las reservas de su local / tenant; fuera de él get_object() da 404.
             return [IsAuthenticated(), IsPersonalReservas()]

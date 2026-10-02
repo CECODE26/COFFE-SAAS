@@ -1,6 +1,29 @@
+from django import forms
 from django.contrib import admin
+from django.db import transaction
 from django.utils.html import format_html
+
+from .imagenes import ImagenInvalida, aplicar_imagen, procesar_imagen, quitar_imagen
 from .models import Category, MenuItem
+
+
+class MenuItemAdminForm(forms.ModelForm):
+    """La foto subida desde el admin pasa por el mismo proceso que la API (WebP, sin EXIF, miniatura)"""
+    foto = forms.FileField(label='Subir/reemplazar foto', required=False)
+    quitar_foto = forms.BooleanField(label='Quitar la foto', required=False)
+
+    class Meta:
+        model = MenuItem
+        exclude = ['image', 'image_thumb']
+
+    def clean_foto(self):
+        archivo = self.cleaned_data.get('foto')
+        if not archivo:
+            return None
+        try:
+            return procesar_imagen(archivo)
+        except ImagenInvalida as error:
+            raise forms.ValidationError(str(error))
 
 
 class MenuItemInline(admin.TabularInline):
@@ -50,11 +73,15 @@ class MenuItemAdmin(admin.ModelAdmin):
     ]
     search_fields = ['name', 'description']
     ordering = ['category', 'name']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'get_profit_margin']
+    readonly_fields = ['id', 'created_at', 'updated_at', 'get_profit_margin', 'get_foto']
+    form = MenuItemAdminForm
 
     fieldsets = (
         ('Información Básica', {
-            'fields': ('id', 'tenant', 'category', 'name', 'slug', 'description', 'image')
+            'fields': ('id', 'tenant', 'category', 'name', 'slug', 'description')
+        }),
+        ('Foto', {
+            'fields': ('get_foto', 'foto', 'quitar_foto')
         }),
         ('Precios', {
             'fields': ('price', 'cost', 'get_profit_margin')
@@ -70,6 +97,21 @@ class MenuItemAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            procesada = form.cleaned_data.get('foto')
+            if procesada:
+                aplicar_imagen(obj, procesada)
+            elif form.cleaned_data.get('quitar_foto') and (obj.image or obj.image_thumb):
+                quitar_imagen(obj)
+
+    def get_foto(self, obj):
+        if not obj.image_thumb:
+            return '-'
+        return format_html('<img src="{}" style="max-height: 120px; border-radius: 6px;">', obj.image_thumb.url)
+    get_foto.short_description = 'Foto actual'
 
     def get_price_display(self, obj):
         return f"${obj.price}"

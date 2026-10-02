@@ -67,12 +67,14 @@ class CafeteriaViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
+        # Mesas reales del local (no hay tope de mesas)
+        mesas = cafeteria.mesas.filter(is_active=True)
         stats_data = {
             'total_users': cafeteria.get_active_users_count(),
             'active_users': cafeteria.get_active_users_count(),
-            'total_tables': cafeteria.max_tables,
-            'occupied_tables': 0,  # A implementar con modelo de Mesas
-            'available_tables': cafeteria.max_tables,
+            'total_tables': mesas.count(),
+            'occupied_tables': mesas.filter(status='ocupada').count(),
+            'available_tables': mesas.filter(status='disponible').count(),
             'capacity': cafeteria.capacity,
             'open_time': cafeteria.open_time,
             'close_time': cafeteria.close_time,

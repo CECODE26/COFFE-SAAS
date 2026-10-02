@@ -200,17 +200,25 @@ export const QrMesaModal = ({ mesa, logo, esAdmin, onClose, onRegenerado }) => {
           size="sm"
           onClick={() => setConfirmando(true)}
           disabled={!qrCode}
-          className="mr-auto !px-3 !text-terracotta-700 hover:!bg-terracotta-100"
+          className="mr-auto !px-3 !tracking-[0.12em] !text-terracotta-700 hover:!bg-terracotta-100"
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
           Regenerar QR
         </Button>
       )}
-      <Button variant="secondary" size="sm" onClick={handleDescargar} disabled={!qrCode || descargando}>
+      {/* Pie en una sola fila: textos cortos y botones compactos */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handleDescargar}
+        disabled={!qrCode || descargando}
+        className="!px-3 !tracking-[0.12em]"
+        title="Descargar la tarjeta en PNG"
+      >
         <Download className="h-3.5 w-3.5" aria-hidden="true" />
-        Descargar PNG
+        Descargar
       </Button>
-      <Button size="sm" onClick={handleImprimir} disabled={!qrCode || imprimiendo}>
+      <Button size="sm" onClick={handleImprimir} disabled={!qrCode || imprimiendo} className="!px-3 !tracking-[0.12em]">
         <Printer className="h-3.5 w-3.5" aria-hidden="true" />
         Imprimir
       </Button>

@@ -47,7 +47,7 @@ const TarjetaItem = ({ item, enCarrito, soloLectura, onAbrir }) => (
       aria-label={`${item.nombre}, ${money(item.precio)}. Ver detalles`}
     >
       <span className="relative shrink-0">
-        <FotoItem src={item.imagen} icono={item.icono} className="h-20 w-20 rounded-xl ring-1 ring-oro-200" />
+        <FotoItem src={item.miniatura || item.imagen} icono={item.icono} className="h-20 w-20 rounded-xl ring-1 ring-oro-200" />
         {enCarrito > 0 && (
           <span className="absolute -left-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-cobalto-500 px-1 text-[10px] font-semibold text-marfil ring-2 ring-marfil">
             {enCarrito}
@@ -418,11 +418,17 @@ export const MenuCliente = () => {
     if (categorias.length && !activa) setActiva(String(categorias[0].id));
   }, [categorias, activa]);
 
-  // Scroll-spy: la categoría visible más arriba es la activa
+  // Scroll-spy: la categoría visible más arriba es la activa. Al llegar al fondo de la página se activa la
+  // última (las categorías cortas del final nunca llegan a la franja de arriba)
   useEffect(() => {
     if (!categorias.length || typeof IntersectionObserver === 'undefined') return undefined;
     const visibles = new Set();
     const orden = categorias.map((c) => String(c.id));
+    // Solo si la página se desplaza: una carta corta está "al fondo" desde el inicio
+    const alFondo = () => {
+      const alto = document.documentElement.scrollHeight;
+      return alto > window.innerHeight + 4 && window.scrollY > 0 && window.innerHeight + window.scrollY >= alto - 4;
+    };
     const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -430,7 +436,7 @@ export const MenuCliente = () => {
           else visibles.delete(e.target.dataset.cat);
         });
         if (bloqueoSpy.current) return;
-        const primera = orden.find((id) => visibles.has(id));
+        const primera = alFondo() ? orden[orden.length - 1] : orden.find((id) => visibles.has(id));
         if (primera) setActiva(primera);
       },
       { rootMargin: '-64px 0px -55% 0px', threshold: 0 }
@@ -439,7 +445,14 @@ export const MenuCliente = () => {
       const el = document.getElementById(`cat-${id}`);
       if (el) obs.observe(el);
     });
-    return () => obs.disconnect();
+    const alDesplazar = () => {
+      if (!bloqueoSpy.current && alFondo()) setActiva(orden[orden.length - 1]);
+    };
+    window.addEventListener('scroll', alDesplazar, { passive: true });
+    return () => {
+      obs.disconnect();
+      window.removeEventListener('scroll', alDesplazar);
+    };
   }, [categorias]);
 
   // La pestaña activa siempre a la vista dentro de la barra

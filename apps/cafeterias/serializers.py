@@ -35,7 +35,7 @@ class CafeteriaDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug', 'description', 'address', 'city',
             'postal_code', 'phone', 'email', 'ruc', 'registration_number',
-            'max_tables', 'capacity', 'open_time', 'close_time',
+            'capacity', 'open_time', 'close_time',
             'logo', 'banner', 'is_active', 'tenant', 'tenant_name',
             'active_users_count', 'mesas_count', 'created_at', 'updated_at'
         ]
@@ -57,15 +57,10 @@ class CafeteriaCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'tenant', 'name', 'description', 'address', 'city',
             'postal_code', 'phone', 'email', 'ruc',
-            'max_tables', 'capacity', 'open_time', 'close_time',
+            'capacity', 'open_time', 'close_time',
             'logo', 'banner'
         ]
         read_only_fields = ['id']
-
-    def validate_max_tables(self, value):
-        if value < 1:
-            raise serializers.ValidationError("Debe tener al menos 1 mesa.")
-        return value
 
     def validate_capacity(self, value):
         if value < 1:
@@ -102,14 +97,9 @@ class CafeteriaUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'address', 'city',
             'postal_code', 'phone', 'email',
-            'max_tables', 'capacity', 'open_time', 'close_time',
+            'capacity', 'open_time', 'close_time',
             'logo', 'banner', 'is_active'
         ]
-
-    def validate_max_tables(self, value):
-        if value < 1:
-            raise serializers.ValidationError("Debe tener al menos 1 mesa.")
-        return value
 
     def validate_capacity(self, value):
         if value < 1:

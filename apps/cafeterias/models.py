@@ -31,7 +31,6 @@ class Cafeteria(models.Model):
     registration_number = models.CharField(_('Número de Registro'), max_length=100, blank=True)
 
     # Capacity
-    max_tables = models.IntegerField(_('Máximo de Mesas'), default=10)
     capacity = models.IntegerField(_('Capacidad de Personas'), default=50)
 
     # Settings

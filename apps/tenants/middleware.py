@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.deprecation import MiddlewareMixin
 from django.http import HttpResponseForbidden
@@ -43,11 +44,15 @@ class TenantMiddleware(MiddlewareMixin):
         if request.user and request.user.is_authenticated:
             return request.user.tenant_id
 
-        # 4. Desde dominio (subdomain)
+        # 4. Desde dominio (subdomain). Los hosts propios del sistema (localhost en desarrollo, el dominio
+        # de ALLOWED_HOSTS en producción) y los subdominios reservados no se interpretan como tenant.
+        # Ambas listas se configuran por entorno (TENANT_HOSTS_SIN_SUBDOMINIO / TENANT_SUBDOMINIOS_RESERVADOS).
         host = request.get_host().split(':')[0]
-        if host not in ['localhost', '127.0.0.1']:
+        hosts_propios = getattr(settings, 'TENANT_HOSTS_SIN_SUBDOMINIO', ['localhost', '127.0.0.1'])
+        reservados = getattr(settings, 'TENANT_SUBDOMINIOS_RESERVADOS', ['api', 'app', 'www', 'admin'])
+        if host not in hosts_propios:
             subdomain = host.split('.')[0]
-            if subdomain and subdomain not in ['api', 'app', 'www', 'admin']:
+            if subdomain and subdomain not in reservados:
                 try:
                     tenant = Tenant.objects.get(slug=subdomain)
                     return tenant.id

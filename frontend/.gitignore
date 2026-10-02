@@ -10,9 +10,10 @@ node_modules/
 /build
 /dist
 
-# Environment
+# Environment (las plantillas .example y .env.development sí se suben: no llevan secretos)
 .env
 .env.local
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local

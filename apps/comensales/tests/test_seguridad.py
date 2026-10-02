@@ -70,10 +70,11 @@ class MenuTests(PruebaQR):
         items = [item for c in r.data['categorias'] for item in c['items']]
         self.assertEqual([i['nombre'] for i in items], ['Cappuccino', 'Sánduche de pernil'])
         self.assertEqual(set(items[0]), {
-            'id', 'nombre', 'descripcion', 'precio', 'imagen', 'vegetariano', 'vegano', 'gluten', 'tiempo',
+            'id', 'nombre', 'descripcion', 'precio', 'imagen', 'miniatura', 'vegetariano', 'vegano', 'gluten', 'tiempo',
         })
         self.assertEqual(items[0]['precio'], '2.80')
         self.assertIsNone(items[0]['imagen'])
+        self.assertIsNone(items[0]['miniatura'])
         self.assertEqual(set(r.data['categorias'][0]) - {'items'}, {'id', 'nombre', 'icono'})
 
         texto = json.dumps(r.data).lower()

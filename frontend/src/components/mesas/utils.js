@@ -1,7 +1,13 @@
-import api from '../../services/api';
+import api, { fetchAll } from '../../services/api';
 
 // Roles que pueden regenerar el QR de una mesa (el backend lo vuelve a validar)
 export const ROLES_ADMIN_QR = ['cafe_admin', 'gerente', 'distribuidor_admin', 'super_admin'];
+
+// Gestionan las mesas (crear, editar, desactivar, borrar): los mismos roles del QR
+export const ROLES_GESTION_MESAS = ROLES_ADMIN_QR;
+
+// Roles con un solo local: el backend usa siempre su cafetería
+export const ROLES_UN_LOCAL = ['cafe_admin', 'gerente'];
 
 export const METODOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -89,6 +95,47 @@ export const comensalesApi = {
   atenderAlerta: (alertaId) => api.post(`/comensales/alertas/${alertaId}/atender/`).then((r) => r.data),
   mesa: (mesaId) => api.get(`/mesas/mesas/${mesaId}/`).then((r) => r.data),
   regenerarQr: (mesaId) => api.post(`/mesas/mesas/${mesaId}/regenerar_qr/`).then((r) => r.data),
+};
+
+// Gestión de mesas (contrato /api/v1/mesas/mesas/)
+export const mesasApi = {
+  // { numero, cafeteria, cafeteria_name, mesas_activas } (sin tope: las mesas que quiera el negocio)
+  siguienteNumero: (cafeteria) =>
+    api.get('/mesas/mesas/siguiente_numero/', { params: cafeteria ? { cafeteria } : {} }).then((r) => r.data),
+  crear: (body) => api.post('/mesas/mesas/', body).then((r) => r.data),
+  editar: (mesaId, body) => api.patch(`/mesas/mesas/${mesaId}/`, body).then((r) => r.data),
+  desactivar: (mesaId) => api.post(`/mesas/mesas/${mesaId}/desactivar/`).then((r) => r.data),
+  reactivar: (mesaId) => api.post(`/mesas/mesas/${mesaId}/reactivar/`).then((r) => r.data),
+  borrar: (mesaId) => api.delete(`/mesas/mesas/${mesaId}/`),
+  // Solo las desactivadas (?solo_inactivas=1: el backend ya filtra, no se descargan todas las mesas)
+  inactivas: () =>
+    fetchAll('/mesas/mesas/?solo_inactivas=1').then((lista) => lista.filter((m) => m.is_active === false)),
+  // Locales abiertos que ve el usuario (distribuidor: su cadena; super_admin: todos), por nombre
+  locales: () =>
+    fetchAll('/cafeterias/').then((lista) =>
+      lista.filter((c) => c.is_active !== false).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'))
+    ),
+};
+
+// Zonas sugeridas cuando el local aún no tiene muchas
+export const ZONAS_BASE = ['Salón', 'Terraza', 'Ventanal', 'Jardín', 'Barra'];
+
+// Zonas usadas por local, de la más a la menos usada: { <cafeteria_id>: ['Ventanal', 'Jardín', ...] }
+export const zonasPorLocal = (mesas) => {
+  const cuentas = {};
+  mesas.forEach((m) => {
+    const zona = (m.location || '').trim();
+    if (!zona || !m.cafeteria) return;
+    const id = String(m.cafeteria);
+    if (!cuentas[id]) cuentas[id] = {};
+    cuentas[id][zona] = (cuentas[id][zona] || 0) + 1;
+  });
+  return Object.fromEntries(
+    Object.entries(cuentas).map(([id, zonas]) => [
+      id,
+      Object.keys(zonas).sort((a, b) => zonas[b] - zonas[a] || a.localeCompare(b, 'es')),
+    ])
+  );
 };
 
 // Logos de los locales: se piden una sola vez por local y se guardan mientras dure la página

@@ -11,13 +11,16 @@ import { money } from '../components/Stats';
 import { DetalleMesa } from '../components/mesas/DetalleMesa';
 import { QrMesaModal } from '../components/mesas/QrMesaModal';
 import { ImprimirQrDialog } from '../components/mesas/ImprimirQrDialog';
+import { MesaForm } from '../components/mesas/MesaForm';
+import { AccionMesaDialog } from '../components/mesas/AccionMesaDialog';
 import { HojaQr } from '../components/mesas/TarjetaQr';
 import { usePolling } from '../components/mesas/usePolling';
 import { useImpresion } from '../components/mesas/useImpresion';
 import {
-  ROLES_ADMIN_QR, comensalesApi, conQrCode, mensajeError, obtenerLogos, plural,
+  ROLES_ADMIN_QR, ROLES_GESTION_MESAS, comensalesApi, conQrCode, mensajeError, mesasApi, obtenerLogos, plural,
+  zonasPorLocal,
 } from '../components/mesas/utils';
-import { Users, Armchair, MapPin, Minus, Plus, X, QrCode, Printer, Smartphone } from 'lucide-react';
+import { Users, Armchair, MapPin, Minus, Pencil, Plus, Power, X, QrCode, Printer, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Franja superior de la tarjeta según el estado de la mesa
@@ -60,6 +63,19 @@ const leerResumen = (r) =>
 
 const tieneQr = (q) => !!q && (q.personas > 0 || q.porCobrar > 0 || q.pideCuenta > 0 || q.llamados > 0);
 
+// Lápiz discreto de la tarjeta para editar la mesa (roles de gestión); va al final de la línea de datos
+const BotonEditar = ({ mesa, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="-my-1 -mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-verde-400 transition-colors hover:bg-pistacho-100 hover:text-cobalto-500"
+    aria-label={`Editar la mesa ${mesa.number}`}
+    title="Editar mesa"
+  >
+    <Pencil className="h-3 w-3" aria-hidden="true" />
+  </button>
+);
+
 // Badge pequeño de la tarjeta ("Pide la cuenta", "Llamado")
 const MiniBadge = ({ tone, children }) => (
   <Badge tone={tone} className="!gap-1 !px-1.5 !py-0.5 !text-[9px] !tracking-[0.08em]">
@@ -71,6 +87,7 @@ export const Mesas = () => {
   const { mesas, fetchMesas, occupyMesa, freeMesa } = useData();
   const { user } = useAuth();
   const esAdmin = ROLES_ADMIN_QR.includes(user?.role);
+  const esGestion = ROLES_GESTION_MESAS.includes(user?.role);
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [guestCount, setGuestCount] = useState(2);
   const [filter, setFilter] = useState('all');
@@ -85,6 +102,10 @@ export const Mesas = () => {
   const [eligiendoLocal, setEligiendoLocal] = useState(false);
   const [preparandoHoja, setPreparandoHoja] = useState(false);
   const { imprimir, imprimiendo, portal } = useImpresion();
+  // Gestión: mesas desactivadas, formulario de alta/edición ({ mesa } o { mesa: null }) y acción por confirmar
+  const [inactivas, setInactivas] = useState([]);
+  const [form, setForm] = useState(null);
+  const [accionMesa, setAccionMesa] = useState(null);
 
   // El detalle se abre con ?mesa=<id> (la campana de alertas enlaza así)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,6 +160,19 @@ export const Mesas = () => {
 
   const refrescar = useCallback(() => Promise.all([fetchMesas(), cargarResumen()]), [fetchMesas, cargarResumen]);
 
+  // Mesas desactivadas (solo gestión); si falla se conserva la última lista
+  const cargarInactivas = useCallback(async () => {
+    try {
+      setInactivas(await mesasApi.inactivas());
+    } catch (error) {
+      /* sin cambios */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (esGestion) cargarInactivas();
+  }, [esGestion, cargarInactivas]);
+
   useEffect(() => {
     const loadMesas = async () => {
       setLoading(true);
@@ -156,6 +190,13 @@ export const Mesas = () => {
 
   // Sondeo cada 10 s (se pausa con la pestaña oculta)
   usePolling(refrescar, REFRESCO_MS, !loading);
+  // Mientras se ven las desactivadas, también se refrescan
+  usePolling(cargarInactivas, REFRESCO_MS, esGestion && !loading && filter === 'inactivas');
+
+  // Al reactivar la última desactivada, el filtro «Inactivas» desaparece: se vuelve a «Todas»
+  useEffect(() => {
+    if (filter === 'inactivas' && inactivas.length === 0) setFilter('all');
+  }, [filter, inactivas.length]);
 
   // Abre el modal de sentar con un número de clientes razonable para la mesa
   const openSeat = (mesa) => {
@@ -232,6 +273,38 @@ export const Mesas = () => {
     if (completa.cafeteria) obtenerLogos([completa.cafeteria]).then((l) => setLogos((prev) => ({ ...prev, ...l })));
   };
 
+  // ---- Gestión de mesas ----
+  const abrirForm = (mesa = null) => setForm({ mesa });
+
+  // Mesa creada: se refresca la grilla y se abre su QR para imprimirlo o descargarlo de una vez
+  const alGuardar = (fila, modo) => {
+    setForm(null);
+    if (modo === 'crear') {
+      toast.success(`Mesa ${fila.number} creada · su QR ya está listo`);
+      setFilter((f) => (f === 'all' || f === 'disponible' ? f : 'all'));
+      abrirQr(fila);
+    } else {
+      toast.success(`Mesa ${fila.number} actualizada`);
+    }
+    refrescar();
+    if (fila.is_active === false) cargarInactivas();
+  };
+
+  // Desactivar / reactivar / borrar se confirman en su propio diálogo
+  const pedirAccion = (accion, mesa) => {
+    setForm(null);
+    setAccionMesa({ accion, mesa });
+  };
+
+  const alTerminarAccion = (accion, respuesta) => {
+    const mesa = accionMesa?.mesa;
+    setAccionMesa(null);
+    toast.success(respuesta?.message || `Mesa ${mesa?.number ?? ''} borrada`, { duration: 6000 });
+    if (accion !== 'reactivar' && mesa && String(detalleId) === String(mesa.id)) cerrarDetalle();
+    refrescar();
+    cargarInactivas();
+  };
+
   // Acción principal de cada estado: etiqueta, variante del botón y qué hace al pulsar
   const mesaAction = (mesa, qr) => {
     // Con comensales QR, la acción es ver la cuenta (desde el detalle se cobra o se cierra)
@@ -254,13 +327,15 @@ export const Mesas = () => {
     }
   };
 
-  const multiCafe = new Set(mesas.map((m) => m.cafeteria)).size > 1;
+  const multiCafe = new Set([...mesas, ...inactivas].map((m) => m.cafeteria)).size > 1;
   const countBy = (s) => mesas.filter((m) => m.status === s).length;
   const sorted = useMemo(() => [...mesas].sort(byCafeAndNumber), [mesas]);
-  const filtered = useMemo(
-    () => (filter === 'all' ? sorted : sorted.filter((m) => m.status === filter)),
-    [sorted, filter]
-  );
+  const filtered = useMemo(() => {
+    if (filter === 'inactivas') return [...inactivas].sort(byCafeAndNumber);
+    return filter === 'all' ? sorted : sorted.filter((m) => m.status === filter);
+  }, [sorted, inactivas, filter]);
+  // Zonas ya usadas en cada local (sugerencias del formulario)
+  const zonas = useMemo(() => zonasPorLocal([...mesas, ...inactivas]), [mesas, inactivas]);
   const pidenCuenta = mesas.filter((m) => num(resumen[String(m.id)]?.solicitudes_pendientes) > 0).length;
 
   // Con varios locales, agrupa las mesas por cafetería (respetando el orden anterior)
@@ -323,8 +398,72 @@ export const Mesas = () => {
   // Posición de cada mesa en la lista visible, para escalonar la animación con tope
   const position = new Map(filtered.map((m, i) => [m.id, i]));
 
+  // Zona, capacidad y lápiz de edición (gestión) en UNA línea: la zona se recorta si no cabe
+  const renderDatos = (mesa, capacidad, etiquetaCapacidad) => (
+    <div className="mt-2 flex items-center gap-2 text-xs text-verde-600">
+      <span className="inline-flex min-w-0 flex-1 items-center gap-1" title={mesa.location || undefined}>
+        {mesa.location && (
+          <>
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
+            <span className="truncate">{mesa.location}</span>
+          </>
+        )}
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-1" title={etiquetaCapacidad} aria-label={etiquetaCapacidad}>
+        <Users className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
+        {capacidad}
+      </span>
+      {esGestion && <BotonEditar mesa={mesa} onClick={() => abrirForm(mesa)} />}
+    </div>
+  );
+
+  const capacidadDe = (mesa) =>
+    mesa.status === 'ocupada' && mesa.is_active !== false
+      ? [`${mesa.guest_count}/${mesa.capacity}`, `${mesa.guest_count} de ${mesa.capacity} personas`]
+      : [String(mesa.capacity), `Capacidad: ${plural(mesa.capacity, 'persona', 'personas')}`];
+
+  // Mesa desactivada (vista "Desactivadas"): atenuada, sin QR ni operación; solo editar o reactivar
+  const renderInactiva = (mesa) => (
+    <Card
+      key={mesa.id}
+      padded={false}
+      className="animate-fade-in relative overflow-hidden !rounded-2xl !border-dashed !bg-crema !shadow-none"
+      style={{ animationDelay: `${Math.min(position.get(mesa.id) || 0, 10) * 40}ms` }}
+    >
+      <span className="absolute inset-x-0 top-0 h-1 bg-verde-200" aria-hidden="true" />
+      <div className="px-3.5 pb-3 pt-3.5">
+        <div className="opacity-60">
+          {/* Si no caben en una fila, el estado baja: nunca tapa el número */}
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <p className="flex shrink-0 items-baseline gap-1.5">
+              <span className="sr-only sm:not-sr-only text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Mesa</span>
+              <span className="font-serif text-[1.6rem] italic font-medium leading-none text-verde-700">{mesa.number}</span>
+            </p>
+            <Badge tone="neutral" className="shrink-0 !px-2 !py-0.5 !text-[9px] !tracking-[0.1em]">
+              Desactivada
+            </Badge>
+          </div>
+          {renderDatos(mesa, ...capacidadDe(mesa))}
+        </div>
+        <div className="mt-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => pedirAccion('reactivar', mesa)}
+            aria-label={`Reactivar la mesa ${mesa.number}`}
+            className="w-full !min-h-[32px] !px-2 !text-[10px] !tracking-[0.12em]"
+          >
+            <Power className="h-3.5 w-3.5" aria-hidden="true" />
+            Reactivar
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+
   // Tarjeta compacta: número y estado en una línea, detalles debajo y la acción dentro
   const renderMesa = (mesa) => {
+    if (mesa.is_active === false) return renderInactiva(mesa);
     const qr = leerResumen(resumen[String(mesa.id)]);
     const conQr = tieneQr(qr);
     const atencion = conQr && (qr.pideCuenta > 0 || qr.llamados > 0);
@@ -343,26 +482,16 @@ export const Mesas = () => {
       >
         <span className={`absolute inset-x-0 top-0 h-1 ${ACCENT[statusTone(mesa.status)]}`} aria-hidden="true" />
         <div className="px-3.5 pb-3 pt-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="flex min-w-0 items-baseline gap-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Mesa</span>
+          {/* Si no caben en una fila, el estado baja: nunca tapa el número */}
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <p className="flex shrink-0 items-baseline gap-1.5">
+              <span className="sr-only sm:not-sr-only text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Mesa</span>
               <span className="font-serif text-[1.6rem] italic font-medium leading-none text-verde-700">{mesa.number}</span>
             </p>
             <StatusBadge status={mesa.status} className="shrink-0 !px-2 !py-0.5 !text-[9px] !tracking-[0.1em]" />
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-verde-600">
-            {mesa.location && (
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
-                <span className="truncate">{mesa.location}</span>
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <Users className="h-3.5 w-3.5 shrink-0 text-oro-600" aria-hidden="true" />
-              {mesa.status === 'ocupada' ? `${mesa.guest_count} / ${mesa.capacity}` : `${mesa.capacity} pers.`}
-            </span>
-          </div>
+          {renderDatos(mesa, ...capacidadDe(mesa))}
 
           {/* Comensales conectados por QR: abre el detalle */}
           {conQr && (
@@ -438,15 +567,6 @@ export const Mesas = () => {
             }.`}
             actions={
               <>
-                <Segmented
-                  value={filter}
-                  onChange={setFilter}
-                  options={[
-                    { value: 'all', label: 'Todas', count: mesas.length },
-                    { value: 'disponible', label: 'Libres', count: countBy('disponible') },
-                    { value: 'ocupada', label: 'Ocupadas', count: countBy('ocupada') },
-                  ]}
-                />
                 <Button
                   variant="secondary"
                   size="sm"
@@ -457,12 +577,53 @@ export const Mesas = () => {
                   <Printer className="h-3.5 w-3.5" aria-hidden="true" />
                   {preparandoHoja && !eligiendoLocal ? 'Preparando…' : 'Imprimir QR'}
                 </Button>
+                {esGestion && (
+                  <Button size="sm" onClick={() => abrirForm()} className="!min-h-[34px] !px-4 !text-[10px]">
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Nueva mesa
+                  </Button>
+                )}
               </>
             }
           />
 
+          {/* Filtros en una sola fila compacta (en el celular se deslizan si no caben) */}
+          {(mesas.length > 0 || inactivas.length > 0) && (
+            <div className="-mx-4 mb-3 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [&>div]:flex-nowrap [&_button]:whitespace-nowrap [&_button]:!px-3 [&_button]:!py-1 [&_button]:!text-[10.5px]">
+              <Segmented
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'Todas', count: mesas.length },
+                  { value: 'disponible', label: 'Libres', count: countBy('disponible') },
+                  { value: 'ocupada', label: 'Ocupadas', count: countBy('ocupada') },
+                  // Solo gestión, y solo si hay alguna desactivada
+                  ...(esGestion && inactivas.length > 0 ? [{ value: 'inactivas', label: 'Inactivas', count: inactivas.length }] : []),
+                ]}
+              />
+            </div>
+          )}
+
           {filtered.length === 0 ? (
-            <EmptyState icon={Armchair} title="Sin mesas aquí" description="Prueba con otro filtro." />
+            filter === 'inactivas' ? (
+              <EmptyState
+                icon={Armchair}
+                title="Sin mesas desactivadas"
+                description="Las mesas que desactives aparecen aquí para reactivarlas."
+              />
+            ) : mesas.length === 0 ? (
+              <EmptyState
+                icon={Armchair}
+                title="Aún no hay mesas"
+                description={
+                  esGestion
+                    ? 'Agrega la primera con «Nueva mesa»: su QR se genera solo.'
+                    : 'El administrador del local todavía no ha agregado mesas.'
+                }
+              />
+            ) : (
+              <EmptyState icon={Armchair} title="Sin mesas aquí" description="Prueba con otro filtro." />
+            )
           ) : (
             <div className="space-y-6">
               {groups.map((g) => (
@@ -481,7 +642,8 @@ export const Mesas = () => {
                       </span>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{g.mesas.map(renderMesa)}</div>
+                  {/* Desde sm, tantas columnas como quepan con tarjetas de 12rem: así nada se parte en dos líneas */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">{g.mesas.map(renderMesa)}</div>
                 </section>
               ))}
             </div>
@@ -572,6 +734,31 @@ export const Mesas = () => {
               onCambio={refrescar}
               onVerQr={abrirQr}
               onMesaLista={() => handleFree(mesaDetalle || { id: detalleId }, 'Mesa lista')}
+              onEditar={esGestion && mesaDetalle ? () => abrirForm(mesaDetalle) : undefined}
+            />
+          )}
+
+          {/* Alta o edición de una mesa (gestión) */}
+          {form && (
+            <MesaForm
+              key={form.mesa ? `editar-${form.mesa.id}` : 'nueva'}
+              mesa={form.mesa}
+              rol={user?.role}
+              zonas={zonas}
+              onClose={() => setForm(null)}
+              onGuardada={alGuardar}
+              onAccion={pedirAccion}
+            />
+          )}
+
+          {/* Confirmar desactivar / reactivar / borrar */}
+          {accionMesa && (
+            <AccionMesaDialog
+              key={`${accionMesa.accion}-${accionMesa.mesa.id}`}
+              accion={accionMesa.accion}
+              mesa={accionMesa.mesa}
+              onClose={() => setAccionMesa(null)}
+              onHecho={alTerminarAccion}
             />
           )}
 

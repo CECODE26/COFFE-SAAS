@@ -1,12 +1,13 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from './api';
 
 // Cliente HTTP de la app del comensal (pedidos por QR).
 // No usa JWT: la sesión viaja en la cookie httpOnly "coffe_comensal" que pone el backend,
 // por eso todas las peticiones van con withCredentials. El header X-Requested-With es la
 // protección anti-CSRF que exige el backend en los métodos que escriben.
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+// La dirección del API es la misma que usa el panel (ver API_BASE_URL en ./api): en producción
+// conviene servir web y API en el mismo sitio para que la cookie SameSite=Lax viaje.
 
 export const CLAVE_MESA = 'coffe_mesa';
 const PREFIJO_CARRITO = 'coffe_carrito_';

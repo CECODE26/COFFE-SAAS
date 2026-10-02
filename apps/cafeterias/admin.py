@@ -4,7 +4,7 @@ from .models import Cafeteria
 
 @admin.register(Cafeteria)
 class CafeteriaAdmin(admin.ModelAdmin):
-    list_display = ['name', 'tenant', 'city', 'capacity', 'max_tables', 'get_active_users_count', 'is_active', 'created_at']
+    list_display = ['name', 'tenant', 'city', 'capacity', 'get_active_users_count', 'is_active', 'created_at']
     list_filter = ['tenant', 'city', 'is_active', 'created_at']
     search_fields = ['name', 'city', 'email', 'phone', 'address']
     ordering = ['-created_at']
@@ -24,7 +24,7 @@ class CafeteriaAdmin(admin.ModelAdmin):
             'fields': ('ruc', 'registration_number')
         }),
         ('Capacidad', {
-            'fields': ('max_tables', 'capacity', 'open_time', 'close_time')
+            'fields': ('capacity', 'open_time', 'close_time')
         }),
         ('Media', {
             'fields': ('logo', 'banner'),

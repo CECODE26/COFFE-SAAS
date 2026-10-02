@@ -43,10 +43,13 @@ db.sqlite3-journal
 /staticfiles/
 /static/
 
-# Environment
+# Environment: los .env reales (secretos, dominios de producción) nunca se suben.
+# Sí se suben las plantillas *.example y frontend/.env.development (solo apunta a localhost).
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
+!frontend/.env.development
 
 # Testing
 .coverage

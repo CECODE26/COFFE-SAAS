@@ -14,7 +14,6 @@ const EMPTY = {
   phone: '',
   email: '',
   ruc: '',
-  max_tables: 10,
   capacity: 40,
   open_time: '07:00',
   close_time: '21:00',
@@ -46,7 +45,7 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
     e.preventDefault();
     setSaving(true);
     setErrors({ fields: {}, general: null });
-    const payload = { ...form, max_tables: Number(form.max_tables), capacity: Number(form.capacity) };
+    const payload = { ...form, capacity: Number(form.capacity) };
     if (!isSuper) delete payload.tenant;
     try {
       const { data } = await api.post('/cafeterias/', payload);
@@ -134,10 +133,7 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
             <span className="rombo" aria-hidden="true" />
             Capacidad y horario
           </p>
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
-            <Field label="Mesas" error={err('max_tables')}>
-              <input className="input" type="number" min="1" value={form.max_tables} onChange={set('max_tables')} />
-            </Field>
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
             <Field label="Personas" error={err('capacity')}>
               <input className="input" type="number" min="1" value={form.capacity} onChange={set('capacity')} />
             </Field>

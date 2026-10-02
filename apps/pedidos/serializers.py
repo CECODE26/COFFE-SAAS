@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from .models import Order, OrderItem
 from apps.menu.models import MenuItem
@@ -183,7 +184,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         tenant_id = user.cafeteria.tenant_id if cafeteria_id else user.tenant_id
         self.fields['mesa'].queryset = Mesa.objects.filter(cafeteria_id=cafeteria_id)
         producto = self.fields['items'].child.fields['menu_item']
-        producto.queryset = MenuItem.objects.filter(tenant_id=tenant_id)
+        # Solo lo que se puede vender: activo, disponible y fuera de categorías ocultas (aunque se conozca el id)
+        producto.queryset = MenuItem.objects.filter(
+            Q(category__isnull=True) | Q(category__is_active=True),
+            tenant_id=tenant_id, is_active=True, is_available=True,
+        )
+        producto.error_messages['does_not_exist'] = 'Ese producto no está disponible en la carta.'
         producto.error_messages['does_not_exist'] = 'Ese producto no está en el menú de tu local.'
 
     def validate_mesa(self, value):

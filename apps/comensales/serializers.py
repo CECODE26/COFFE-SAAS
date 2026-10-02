@@ -297,6 +297,8 @@ def datos_menu(sesion, request):
             'descripcion': producto.description,
             'precio': dinero(producto.price),
             'imagen': url_archivo(request, producto.image),
+            # Miniatura WebP (máx. 480 px) para la lista; null si el producto no tiene foto procesada
+            'miniatura': url_archivo(request, producto.image_thumb),
             'vegetariano': producto.is_vegetarian,
             'vegano': producto.is_vegan,
             'gluten': producto.has_gluten,
