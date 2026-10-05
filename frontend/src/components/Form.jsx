@@ -1,19 +1,70 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 
+const ENFOCABLES =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Diálogo con foco gestionado: al abrir entra en el control marcado con data-autofocus (o en el propio
+// diálogo, si ningún campo lo tomó con autoFocus), Tab no sale del diálogo y al cerrar vuelve a quien lo abrió.
 export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, footer, size = 'md' }) => {
   const titleId = useId();
+  const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  // Quien abrió el diálogo se anota al renderizar, antes de que un autoFocus del contenido mueva el foco
+  const openerRef = useRef(null);
+  if (!open) openerRef.current = null;
+  else if (!openerRef.current && typeof document !== 'undefined') openerRef.current = document.activeElement;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const opener = openerRef.current;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.contains(document.activeElement)) {
+      (dialog.querySelector('[data-autofocus]') || dialog).focus({ preventScroll: true });
+    }
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current?.();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialog) return;
+      const nodos = Array.from(dialog.querySelectorAll(ENFOCABLES)).filter((n) => n.offsetParent !== null);
+      const activo = document.activeElement;
+      if (!nodos.length) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const primero = nodos[0];
+      const ultimo = nodos[nodos.length - 1];
+      if (!dialog.contains(activo)) {
+        // P. ej. el botón pulsado quedó deshabilitado mientras trabaja y el foco cayó al fondo
+        e.preventDefault();
+        (e.shiftKey ? ultimo : primero).focus();
+      } else if (e.shiftKey && (activo === primero || activo === dialog)) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && activo === ultimo) {
+        e.preventDefault();
+        primero.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      // Solo si el foco se perdió con el diálogo: no se le quita a otro diálogo que se abrió en su lugar
+      const activo = document.activeElement;
+      const perdido = !activo || activo === document.body || dialog?.contains(activo);
+      if (perdido && opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -23,10 +74,12 @@ export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, foote
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-verde-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`animate-fade-in relative flex max-h-[92vh] w-full ${widths[size]} flex-col rounded-t-3xl border border-oro-300/70 bg-marfil shadow-lift sm:rounded-3xl`}
+        tabIndex={-1}
+        className={`animate-fade-in relative flex max-h-[92vh] w-full ${widths[size]} flex-col rounded-t-3xl border border-oro-300/70 bg-marfil shadow-lift focus:outline-none sm:rounded-3xl`}
       >
         {/* Cabecera: antetítulo manuscrito, título en cursiva y filete de oro */}
         <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-6 sm:px-7 sm:pt-7">

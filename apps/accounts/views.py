@@ -1,9 +1,13 @@
+from django.db import models, transaction
 from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from apps.auditoria.services import conservar_autoria, registrar
 
 from .models import User
 from .serializers import (
@@ -12,7 +16,7 @@ from .serializers import (
     ChangePasswordSerializer
 )
 from .permissions import (
-    CanCreateUser, CanManageUser, IsOwnUser, IsSuperAdmin, IsTenantMember
+    CanCreateUser, CanDeleteUser, CanManageUser, IsOwnUser, IsSuperAdmin, IsTenantMember
 )
 
 
@@ -70,6 +74,51 @@ class DistribuidorRegistrationView(views.APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+def _bloquear_para_quitar(usuario):
+    """
+    Bloquea la cuenta que se va a eliminar o desactivar (llamar dentro de transaction.atomic()).
+
+    Devuelve (cuenta, deja_sin_super_admin):
+    - cuenta: la fila recién leída y bloqueada, o None si otra petición ya la eliminó.
+    - deja_sin_super_admin: True si quitarla deja la plataforma sin ningún super admin activo.
+
+    Si es super admin, antes se bloquean todos los super admins activos, siempre en el mismo orden (pk): dos
+    peticiones cruzadas (eliminar o desactivar, en cualquier combinación) esperan su turno y la segunda ve
+    el resultado de la primera, así que nunca quedan los dos fuera.
+    """
+    activos = []
+    if usuario.role == 'super_admin':
+        activos = list(
+            User.objects.select_for_update()
+            .filter(role='super_admin', is_active=True)
+            .order_by('pk')
+            .values_list('pk', flat=True)
+        )
+    cuenta = User.objects.select_for_update().filter(pk=usuario.pk).first()
+    return cuenta, cuenta is not None and activos == [cuenta.pk]
+
+
+def _registros_sin_autor(usuario):
+    """
+    Cuántos registros de cada modelo quedarán sin su nombre al eliminar la cuenta (relaciones SET_NULL).
+    include_hidden: también las relaciones con related_name='+' (p. ej. SolicitudPago.procesada_por).
+    """
+    conteo = {}
+    for relacion in User._meta.get_fields(include_hidden=True):
+        if not (relacion.is_relation and relacion.auto_created and not relacion.concrete):
+            continue  # solo las relaciones inversas (otros modelos que apuntan a User)
+        if relacion.many_to_many or getattr(relacion, 'on_delete', None) is not models.SET_NULL:
+            continue
+        modelo = relacion.related_model
+        total = modelo._base_manager.filter(**{relacion.field.name: usuario}).count()
+        if total:
+            conteo[modelo._meta.label] = conteo.get(modelo._meta.label, 0) + total
+    return conteo
+
+
+ULTIMO_SUPER_ADMIN = 'No puedes {} al último super administrador activo de la plataforma.'
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """CRUD de Usuarios - Multi-tenant"""
     queryset = User.objects.all()
@@ -94,7 +143,8 @@ class UserViewSet(viewsets.ModelViewSet):
             # Su propio perfil, o el personal que administra (cafe_admin: solo el de su local)
             return [IsAuthenticated(), (IsOwnUser | CanManageUser)()]
         elif self.action == 'destroy':
-            return [IsAuthenticated(), IsOwnUser()]
+            # Solo el super admin elimina cuentas; los demás gestores las desactivan
+            return [IsAuthenticated(), CanDeleteUser()]
         elif self.action in ['activate', 'deactivate']:
             # Aquí no se aplican los permission_classes del @action: este método manda
             return [IsAuthenticated(), CanManageUser()]
@@ -108,7 +158,11 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.all()
 
         if user.role == 'distribuidor_admin':
-            return User.objects.filter(tenant=user.tenant)
+            # Sin tenant (solo posible desde el /admin) no tiene red: filtrar por tenant=None le mostraría
+            # a los super admins y demás cuentas sin tenant
+            if not user.tenant_id:
+                return User.objects.filter(id=user.id)
+            return User.objects.filter(tenant_id=user.tenant_id)
 
         # Otros roles (incluido cafe_admin) solo ven usuarios de su cafetería y de su tenant
         if user.cafeteria_id:
@@ -119,6 +173,72 @@ class UserViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Crear usuario con tenant del request"""
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Eliminar una cuenta (solo super admin, p. ej. una creada por error). Todas las relaciones con
+        User son SET_NULL: sus pedidos, cobros, alertas y registros de auditoría se conservan sin su nombre
+        (los de auditoría anotan en el detalle quién era, ver conservar_autoria).
+        """
+        usuario = self.get_object()
+        if usuario.pk == request.user.pk:
+            return Response(
+                {'detail': 'No puedes eliminar tu propia cuenta.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            usuario, deja_sin_super_admin = _bloquear_para_quitar(usuario)
+            if usuario is None:
+                raise NotFound('Esta cuenta ya fue eliminada.')
+            if deja_sin_super_admin:
+                return Response(
+                    {'detail': ULTIMO_SUPER_ADMIN.format('eliminar')},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Antes del borrado (después ya no se puede consultar): quién era y qué deja sin su nombre.
+            # Sus registros de auditoría guardan en el detalle quién los hizo.
+            sin_autor = _registros_sin_autor(usuario)
+            conservar_autoria(usuario)
+            registrar(
+                request.user, 'usuario.eliminar', usuario,
+                email=usuario.email,
+                nombre=usuario.get_full_name(),
+                rol=usuario.role,
+                tenant_id=usuario.tenant_id,
+                tenant=usuario.tenant.name if usuario.tenant_id else None,
+                cafeteria_id=usuario.cafeteria_id,
+                cafeteria=usuario.cafeteria.name if usuario.cafeteria_id else None,
+                registros_sin_autor=sin_autor,
+            )
+            usuario.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _cambiar_estado(self, activo):
+        """
+        Activar o desactivar con la fila bloqueada: si otra petición la eliminó al mismo tiempo responde 404
+        (un save() sin fila la volvería a crear). Desactivar respeta la regla del último super admin activo.
+        """
+        usuario = self.get_object()
+        with transaction.atomic():
+            if activo:
+                usuario = User.objects.select_for_update().filter(pk=usuario.pk).first()
+            else:
+                usuario, deja_sin_super_admin = _bloquear_para_quitar(usuario)
+                if usuario is not None and deja_sin_super_admin:
+                    return Response(
+                        {'detail': ULTIMO_SUPER_ADMIN.format('desactivar')},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            if usuario is None:
+                raise NotFound('Esta cuenta ya fue eliminada.')
+            usuario.is_active = activo
+            usuario.save(update_fields=['is_active', 'updated_at'])
+        return Response(
+            {'status': 'success', 'message': 'Usuario activado' if activo else 'Usuario desactivado'},
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
@@ -161,13 +281,7 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def activate(self, request, pk=None):
         """Activar usuario"""
-        user = self.get_object()
-        user.is_active = True
-        user.save()
-        return Response(
-            {'status': 'success', 'message': 'Usuario activado'},
-            status=status.HTTP_200_OK
-        )
+        return self._cambiar_estado(True)
 
     @action(
         detail=True, methods=['post'],
@@ -175,10 +289,4 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def deactivate(self, request, pk=None):
         """Desactivar usuario"""
-        user = self.get_object()
-        user.is_active = False
-        user.save()
-        return Response(
-            {'status': 'success', 'message': 'Usuario desactivado'},
-            status=status.HTTP_200_OK
-        )
+        return self._cambiar_estado(False)

@@ -1,4 +1,8 @@
 """El admin de cafetería lista, edita, activa y desactiva solo al personal de su local"""
+from rest_framework.test import APIRequestFactory
+
+from apps.accounts.permissions import CanManageUser, IsOwnUser
+
 from .base import API_USERS, PruebaUsuarios, crear_usuario
 
 
@@ -97,3 +101,59 @@ class ActivarDesactivarTests(PruebaUsuarios):
         for quien in [self.gerente, self.camarero, self.cajero, self.cocinero]:
             with self.subTest(rol=quien.role):
                 self.assertEqual(self.accion(quien, self.camarero, 'deactivate').status_code, 403)
+
+    def test_no_desactiva_al_ultimo_super_admin_activo(self):
+        # Con JWT un super admin inactivo no entra; force_authenticate permite probar la regla
+        self.super_admin.is_active = False
+        self.super_admin.save(update_fields=['is_active'])
+        unico_activo = crear_usuario('super_admin')
+
+        r = self.accion(self.super_admin, unico_activo, 'deactivate')
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn('último super administrador activo', r.data['detail'])
+        unico_activo.refresh_from_db()
+        self.assertTrue(unico_activo.is_active)
+
+    def test_desactiva_un_super_admin_si_queda_otro_activo(self):
+        otro = crear_usuario('super_admin')
+        self.assertEqual(self.accion(self.super_admin, otro, 'deactivate').status_code, 200)
+        otro.refresh_from_db()
+        self.assertFalse(otro.is_active)
+        self.assertEqual(self.accion(self.super_admin, otro, 'activate').status_code, 200)
+
+
+class DistribuidorSinTenantTests(PruebaUsuarios):
+    """Un distribuidor_admin sin tenant (solo se puede crear desde el /admin) no tiene red que gestionar"""
+
+    def setUp(self):
+        super().setUp()
+        self.sin_tenant = crear_usuario('distribuidor_admin')
+        self.huerfano = crear_usuario('usuario')  # otra cuenta sin tenant
+
+    def test_no_lista_ni_ve_a_otros(self):
+        cliente = self.como(self.sin_tenant)
+        self.assertEqual(cliente.get(API_USERS).status_code, 403)  # IsTenantMember
+        r = cliente.patch(f'{API_USERS}{self.sin_tenant.pk}/', {'first_name': 'Pablo'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_no_toca_a_super_admins_ni_cuentas_sin_tenant(self):
+        cliente = self.como(self.sin_tenant)
+        for objetivo in [self.super_admin, self.huerfano]:
+            with self.subTest(usuario=objetivo.email):
+                r = cliente.post(f'{API_USERS}{objetivo.pk}/deactivate/', {}, format='json')
+                self.assertEqual(r.status_code, 404, r.content)
+                r = cliente.patch(f'{API_USERS}{objetivo.pk}/', {'first_name': 'X'}, format='json')
+                self.assertEqual(r.status_code, 404, r.content)
+                objetivo.refresh_from_db()
+                self.assertTrue(objetivo.is_active)
+                self.assertNotEqual(objetivo.first_name, 'X')
+
+    def test_permisos_sin_tenant_aunque_la_cuenta_quede_al_alcance(self):
+        # Defensa en profundidad: aunque get_queryset cambie, None == None no da permiso
+        peticion = APIRequestFactory().post('/')
+        peticion.user = self.sin_tenant
+        for objetivo in [self.super_admin, self.huerfano]:
+            with self.subTest(usuario=objetivo.email):
+                self.assertFalse(CanManageUser().has_object_permission(peticion, None, objetivo))
+                self.assertFalse(IsOwnUser().has_object_permission(peticion, None, objetivo))
+        self.assertTrue(IsOwnUser().has_object_permission(peticion, None, self.sin_tenant))

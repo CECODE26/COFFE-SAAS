@@ -168,7 +168,8 @@ class CanManageUser(permissions.BasePermission):
         if user.role == 'super_admin':
             return True
         if user.role == 'distribuidor_admin':
-            return user.tenant_id == obj.tenant_id
+            # Sin tenant no gestiona a nadie (None == None incluiría a los super admins)
+            return user.tenant_id is not None and user.tenant_id == obj.tenant_id
         if user.role == 'cafe_admin':
             return (
                 obj.role in PERSONAL_DE_CAFETERIA and
@@ -177,6 +178,20 @@ class CanManageUser(permissions.BasePermission):
                 obj.cafeteria_id == user.cafeteria_id
             )
         return False
+
+
+class CanDeleteUser(permissions.BasePermission):
+    """
+    Eliminar una cuenta: solo el super admin. Los demás gestores la desactivan (CanManageUser).
+    Las reglas de negocio (no a sí mismo, no al último super admin activo) las aplica UserViewSet.destroy.
+    """
+    message = "Solo el super administrador puede eliminar cuentas. Puedes desactivarla en su lugar."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and
+            request.user.role == 'super_admin'
+        )
 
 
 class IsTenantOwner(permissions.BasePermission):
@@ -201,7 +216,11 @@ class IsOwnUser(permissions.BasePermission):
         if request.user.role == 'super_admin':
             return True
 
-        if request.user.role == 'distribuidor_admin':
-            return request.user.tenant_id == obj.tenant_id
+        if request.user.id == obj.id:
+            return True
 
-        return request.user.id == obj.id
+        if request.user.role == 'distribuidor_admin':
+            # Sin tenant solo su propio perfil (None == None incluiría a los super admins)
+            return request.user.tenant_id is not None and request.user.tenant_id == obj.tenant_id
+
+        return False
