@@ -159,7 +159,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         # Formulario público de derechos LOPDP
         'solicitudes_datos': '5/hour',
-        # Inicio de sesión y registro públicos (además del límite en nginx)
+        # Inicio de sesión público y alta de distribuidor por /auth/register/ (además del límite en nginx)
         'login': config('THROTTLE_LOGIN', default='10/min'),
         'registro': config('THROTTLE_REGISTRO', default='5/hour'),
     },

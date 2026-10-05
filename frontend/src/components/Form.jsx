@@ -66,9 +66,18 @@ export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, foote
 
 export const Field = ({ label, error, hint, required, children, className = '' }) => {
   const id = useId();
-  // Enlaza la etiqueta con el control cuando el hijo es un input/select/textarea directo
+  const noteId = `${id}-nota`;
+  const note = error || hint;
+  // Enlaza la etiqueta con el control cuando el hijo es un input/select/textarea directo,
+  // y el error (o la pista) como descripción del control
   const linkable = React.isValidElement(children) && ['input', 'select', 'textarea'].includes(children.type);
-  const control = linkable ? React.cloneElement(children, { id: children.props.id || id }) : children;
+  const control = linkable
+    ? React.cloneElement(children, {
+        id: children.props.id || id,
+        'aria-invalid': error ? true : children.props['aria-invalid'],
+        'aria-describedby': [children.props['aria-describedby'], note && noteId].filter(Boolean).join(' ') || undefined,
+      })
+    : children;
   return (
     <div className={className}>
       {label && (
@@ -79,9 +88,9 @@ export const Field = ({ label, error, hint, required, children, className = '' }
       )}
       {control}
       {error ? (
-        <p className="field-error mt-1.5 text-xs text-terracotta-700">{error}</p>
+        <p id={noteId} role="alert" className="field-error mt-1.5 text-xs text-terracotta-700">{error}</p>
       ) : (
-        hint && <p className="field-hint mt-1.5 text-xs text-verde-600">{hint}</p>
+        hint && <p id={noteId} className="field-hint mt-1.5 text-xs text-verde-600">{hint}</p>
       )}
     </div>
   );

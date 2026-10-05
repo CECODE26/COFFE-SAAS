@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Layout, PageHeader, Loader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Badge } from '../components/StatusBadge';
+import { Button } from '../components/Button';
 import { StatTile, UsageBar, Avatar, money } from '../components/Stats';
-import { PLAN_LABELS } from '../lib/roles';
+import { TenantForm } from '../components/TenantForm';
+import { UserForm } from '../components/UserForm';
+import { PLAN_LABELS, PLANES_DE_PAGO } from '../lib/roles';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Network, Store, Users, CircleDollarSign, ArrowUpRight, Power, MoreHorizontal } from 'lucide-react';
+import { Network, Store, Users, CircleDollarSign, ArrowUpRight, Power, MoreHorizontal, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { fetchAll } from '../services/api';
 
@@ -37,6 +40,17 @@ export const Plataforma = () => {
   const [users, setUsers] = useState({ active: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [openMenu, setOpenMenu] = useState(null);
+  // Alta de distribuidor y, al terminar, de su administrador (UserForm con ese distribuidor elegido)
+  const [creatingTenant, setCreatingTenant] = useState(false);
+  const [adminFor, setAdminFor] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // /plataforma?nuevo=distribuidor (p. ej. desde el aviso del formulario de usuarios) abre el alta
+  useEffect(() => {
+    if (searchParams.get('nuevo') !== 'distribuidor') return;
+    setCreatingTenant(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     const [t, c, o, u] = await Promise.all([
@@ -75,16 +89,22 @@ export const Plataforma = () => {
     .map((t) => ({ name: t.name, value: Math.round((salesByTenant[t.id] || 0) * 100) / 100, plan: t.plan }))
     .sort((a, b) => b.value - a.value);
 
-  const planCounts = Object.keys(PLAN_LABELS).map((p) => ({ plan: p, count: tenants.filter((t) => t.plan === p).length }));
+  // No hay plan gratis: solo aparece si queda alguna cuenta antigua en él
+  const planCounts = Object.keys(PLAN_LABELS)
+    .map((p) => ({ plan: p, count: tenants.filter((t) => t.plan === p).length }))
+    .filter(({ plan, count }) => plan !== 'free' || count > 0);
 
   const runAction = async (fn, ok) => {
     setOpenMenu(null);
     try {
-      await fn();
+      const res = await fn();
       toast.success(ok);
+      // Bajar a un plan con menos cupo del que ya usa se permite, pero el backend avisa
+      if (res?.data?.aviso) toast(res.data.aviso, { duration: 8000 });
       await load();
-    } catch {
-      toast.error('No se pudo completar la acción');
+    } catch (error) {
+      const data = error?.response?.data;
+      toast.error(data?.error || data?.detail || 'No se pudo completar la acción');
     }
   };
 
@@ -98,6 +118,11 @@ export const Plataforma = () => {
             eyebrow="Consola de plataforma"
             title="Toda la red, de un vistazo"
             subtitle="Distribuidores, planes y actividad de cada cafetería en COFFE-SAAS."
+            actions={
+              <Button onClick={() => setCreatingTenant(true)}>
+                <Plus className="h-4 w-4" aria-hidden="true" /> Nuevo distribuidor
+              </Button>
+            }
           />
 
           <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -116,7 +141,9 @@ export const Plataforma = () => {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* relative: contiene el "Acciones" sr-only (absolute); sin esto se escapaba del scroll
+                y ensanchaba toda la página en móvil, y el modal de alta salía cortado */}
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[820px] text-sm">
                 <thead>
                   <tr className="border-y border-oro-300/60 bg-crema/70 text-left text-[11px] uppercase tracking-[0.18em] text-verde-600">
@@ -132,6 +159,17 @@ export const Plataforma = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-oro-200/60">
+                  {tenants.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center">
+                        <p className="font-serif text-xl italic text-verde-700">Todavía no hay distribuidores</p>
+                        <p className="mt-1 text-sm text-verde-600">Crea el primero y luego su administrador.</p>
+                        <Button size="sm" variant="secondary" className="mt-4" onClick={() => setCreatingTenant(true)}>
+                          <Plus className="h-4 w-4" aria-hidden="true" /> Nuevo distribuidor
+                        </Button>
+                      </td>
+                    </tr>
+                  )}
                   {tenants.map((t) => {
                     const [tone, label] = TENANT_STATUS[t.status] || TENANT_STATUS.inactive;
                     return (
@@ -194,12 +232,16 @@ export const Plataforma = () => {
                               <p className="px-3 pb-1 text-[10px] font-medium uppercase tracking-[0.22em] text-oro-600">
                                 Cambiar plan
                               </p>
-                              {Object.entries(PLAN_LABELS).map(([plan, name]) => (
+                              {/* Planes que se venden; el gratis solo se ve (como actual) en cuentas antiguas */}
+                              {(t.plan === 'free' ? ['free', ...PLANES_DE_PAGO] : PLANES_DE_PAGO).map((plan) => (
                                 <button
                                   key={plan}
                                   disabled={plan === t.plan}
                                   onClick={() =>
-                                    runAction(() => api.post(`/tenants/${t.id}/upgrade_plan/`, { plan }), `Plan ${name} asignado`)
+                                    runAction(
+                                      () => api.post(`/tenants/${t.id}/upgrade_plan/`, { plan }),
+                                      `Plan ${PLAN_LABELS[plan]} asignado`
+                                    )
                                   }
                                   className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-verde-700 transition-colors hover:bg-pistacho-50 hover:text-cobalto-500 disabled:cursor-default disabled:text-verde-500 disabled:hover:bg-transparent"
                                 >
@@ -209,7 +251,7 @@ export const Plataforma = () => {
                                       style={{ background: PLAN_COLOR[plan] }}
                                       aria-hidden="true"
                                     />
-                                    {name}
+                                    {PLAN_LABELS[plan]}
                                   </span>
                                   {plan === t.plan && (
                                     <span className="text-[10px] uppercase tracking-[0.18em] text-cobalto-500">actual</span>
@@ -232,42 +274,47 @@ export const Plataforma = () => {
               <div className="mb-6">
                 <SectionTitle script="Cifras" title="Volumen por distribuidor" subtitle="Pedidos no cancelados, en USD" />
               </div>
-              <ResponsiveContainer width="100%" height={chartData.length * 52 + 10}>
-                <BarChart data={chartData} layout="vertical" barSize={22} margin={{ left: 0, right: 16 }}>
-                  <XAxis type="number" hide />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={150}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#2A4520', fontSize: 12, fontFamily: 'Jost, sans-serif' }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: '#BFD8A5', fillOpacity: 0.25 }}
-                    contentStyle={{
-                      background: '#2A4520',
-                      border: '1px solid #C39B45',
-                      borderRadius: 14,
-                      fontSize: 13,
-                      fontFamily: 'Jost, sans-serif',
-                    }}
-                    itemStyle={{ color: '#FFFBF1' }}
-                    labelStyle={{ color: '#D8B45C', fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}
-                    formatter={(v) => [money(v), 'Volumen']}
-                  />
-                  <Bar dataKey="value" radius={[4, 12, 12, 4]}>
-                    {chartData.map((d) => (
-                      <Cell
-                        key={d.name}
-                        fill={PLAN_COLOR[d.plan]}
-                        stroke={d.plan === 'free' ? '#7C9E5C' : undefined}
-                        strokeWidth={d.plan === 'free' ? 1 : 0}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.length === 0 && (
+                <p className="py-6 text-center text-sm text-verde-600">Aparecerá cuando haya distribuidores en la red.</p>
+              )}
+              {chartData.length > 0 && (
+                <ResponsiveContainer width="100%" height={chartData.length * 52 + 10}>
+                  <BarChart data={chartData} layout="vertical" barSize={22} margin={{ left: 0, right: 16 }}>
+                    <XAxis type="number" hide />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={150}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#2A4520', fontSize: 12, fontFamily: 'Jost, sans-serif' }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: '#BFD8A5', fillOpacity: 0.25 }}
+                      contentStyle={{
+                        background: '#2A4520',
+                        border: '1px solid #C39B45',
+                        borderRadius: 14,
+                        fontSize: 13,
+                        fontFamily: 'Jost, sans-serif',
+                      }}
+                      itemStyle={{ color: '#FFFBF1' }}
+                      labelStyle={{ color: '#D8B45C', fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}
+                      formatter={(v) => [money(v), 'Volumen']}
+                    />
+                    <Bar dataKey="value" radius={[4, 12, 12, 4]}>
+                      {chartData.map((d) => (
+                        <Cell
+                          key={d.name}
+                          fill={PLAN_COLOR[d.plan]}
+                          stroke={d.plan === 'free' ? '#7C9E5C' : undefined}
+                          strokeWidth={d.plan === 'free' ? 1 : 0}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </Card>
 
             <Card className="lg:col-span-2">
@@ -305,6 +352,22 @@ export const Plataforma = () => {
           </div>
         </>
       )}
+      <TenantForm
+        open={creatingTenant}
+        onClose={() => setCreatingTenant(false)}
+        onCreated={() => load().catch(() => {})}
+        onCreateAdmin={(tenant) => {
+          setCreatingTenant(false);
+          setAdminFor(tenant);
+        }}
+      />
+      <UserForm
+        open={!!adminFor}
+        onClose={() => setAdminFor(null)}
+        onCreated={() => load().catch(() => {})}
+        initialRole="distribuidor_admin"
+        initialTenant={adminFor?.id}
+      />
     </Layout>
   );
 };

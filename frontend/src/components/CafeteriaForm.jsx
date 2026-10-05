@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Modal, Field, FormAlert, parseApiErrors } from './Form';
 import { Button } from './Button';
-import { PLAN_LABELS } from '../lib/roles';
+import { PLAN_LABELS, isUnlimited } from '../lib/roles';
 import toast from 'react-hot-toast';
 import api, { fetchAll } from '../services/api';
 
@@ -89,9 +89,9 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
             }
             hint={
               selectedTenant &&
-              `Plan ${PLAN_LABELS[selectedTenant.plan]} · ${selectedTenant.active_cafes_count} de ${
-                selectedTenant.max_cafes >= 999 ? '∞' : selectedTenant.max_cafes
-              } cafeterías`
+              `Plan ${PLAN_LABELS[selectedTenant.plan]} · ${selectedTenant.active_cafes_count} ${
+                isUnlimited(selectedTenant.max_cafes) ? 'cafeterías · ilimitado' : `de ${selectedTenant.max_cafes} cafeterías`
+              }`
             }
           >
             <select className="input" value={form.tenant} onChange={set('tenant')} required>

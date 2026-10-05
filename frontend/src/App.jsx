@@ -26,6 +26,8 @@ import { Derechos } from './pages/legal/Derechos';
 import { Bienvenida, ClienteApp } from './pages/cliente';
 
 const ADMINS = ['super_admin', 'distribuidor_admin'];
+// Usuarios/Equipo: también el admin de cafetería, que gestiona al personal de su local
+const GESTORES_DE_EQUIPO = [...ADMINS, 'cafe_admin'];
 
 const routes = [
   // Super Admin
@@ -35,7 +37,7 @@ const routes = [
   { path: '/distribuidor', element: <Distribuidor />, roles: ['distribuidor_admin'] },
   // Compartidas entre administradores
   { path: '/cafeterias', element: <Cafeterias />, roles: ADMINS },
-  { path: '/usuarios', element: <Usuarios />, roles: ADMINS },
+  { path: '/usuarios', element: <Usuarios />, roles: GESTORES_DE_EQUIPO },
   // Operación de cafetería
   { path: '/dashboard', element: <Dashboard /> },
   { path: '/mesas', element: <Mesas /> },

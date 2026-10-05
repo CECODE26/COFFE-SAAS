@@ -132,7 +132,7 @@ Documentación: http://localhost:8000/api/docs/
 ### Autenticación
 - `POST /api/v1/auth/login/` - Login
 - `POST /api/v1/auth/refresh/` - Refresh token
-- `POST /api/v1/auth/register/` - Registro (distribuidores)
+- `POST /api/v1/auth/register/` - Alta de distribuidor con su administrador (solo super admin)
 
 ### Distribuidores (Super Admin)
 - `GET /api/v1/tenants/` - Listar distribuidores

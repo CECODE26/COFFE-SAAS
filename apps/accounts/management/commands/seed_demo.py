@@ -50,7 +50,7 @@ from apps.menu.imagenes import ImagenInvalida, aplicar_imagen, procesar_imagen
 from apps.menu.models import Category, MenuItem
 from apps.mesas.models import Mesa, Reserva, generar_token_qr
 from apps.pedidos.models import Order, OrderItem
-from apps.tenants.models import Tenant
+from apps.tenants.models import LIMITES_POR_PLAN, Tenant
 
 PASSWORD = 'admin123'
 
@@ -173,10 +173,6 @@ TENANTS = [
         ],
     },
 ]
-
-PLAN_LIMITS = {
-    'free': (1, 10), 'basic': (5, 50), 'pro': (20, 500), 'enterprise': (999, 9999),
-}
 
 MENU = [
     ('Café de especialidad', '☕', [
@@ -443,7 +439,7 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ distribuidores y locales
 
     def _create_tenant(self, t_idx, data):
-        max_cafes, max_users = PLAN_LIMITS[data['plan']]
+        limites = LIMITES_POR_PLAN[data['plan']]
         activo = data['status'] == 'active'
         # Fechas de alta escalonadas para que el listado tenga historia
         alta = (self.now - timedelta(days=30 * (len(TENANTS) - t_idx) + 7)).replace(
@@ -454,7 +450,7 @@ class Command(BaseCommand):
             name=data['name'], slug=slugify(data['name']), email=data['email'], phone=data['phone'],
             city=data['city'], address=data['cafes'][0]['direccion'], ruc=data['ruc'],
             business_name=data['business_name'], plan=data['plan'], status=data['status'],
-            is_active=activo, max_cafes=max_cafes, max_users=max_users,
+            is_active=activo, **limites,
             description=f"Distribuidor de cafeterías en {data['city']}.",
             # Los no activos dejaron vencer la suscripción unos días antes de la baja
             subscription_expires_at=self.now + timedelta(days=data['vence_en']) if activo else baja - timedelta(days=3),

@@ -117,19 +117,66 @@ class CanCreateCafeteria(permissions.BasePermission):
         return tenant and tenant.can_create_cafe()
 
 
+# Quién crea a quién: super_admin crea distribuidores (tenants) y usuarios de cualquier rol,
+# distribuidor_admin solo crea Admin Cafetería y cafe_admin solo el personal de su local.
+# El serializer (UserCreateSerializer.ASSIGNABLE_ROLES) decide qué rol puede asignar cada uno.
+CREADORES_DE_USUARIOS = ('super_admin', 'distribuidor_admin', 'cafe_admin')
+# Personal que gestiona el admin de una cafetería (crear, editar, activar y desactivar)
+PERSONAL_DE_CAFETERIA = ('gerente', 'camarero', 'cajero', 'cocinero')
+
+
 class CanCreateUser(permissions.BasePermission):
-    """Verificar si puede crear más usuarios"""
-    message = "Has alcanzado el límite de usuarios para tu plan."
+    """Puede crear usuarios: rol creador, con tenant (y local, si es cafe_admin) y cupo en el plan"""
+    message = "No tienes permisos para crear usuarios."
 
     def has_permission(self, request, view):
-        if request.user.role == 'super_admin':
+        user = request.user
+        if user.role == 'super_admin':
             return True
 
-        if request.user.role != 'distribuidor_admin':
+        if user.role not in CREADORES_DE_USUARIOS or not user.tenant_id:
+            return False
+        if user.role == 'cafe_admin' and not user.cafeteria_id:
+            self.message = "Tu cuenta no tiene una cafetería asignada."
             return False
 
-        tenant = request.user.tenant
-        return tenant and tenant.can_create_user()
+        if not user.tenant.can_create_user():
+            self.message = "Has alcanzado el límite de usuarios para tu plan."
+            return False
+        return True
+
+
+class CanManageUser(permissions.BasePermission):
+    """
+    Editar, activar o desactivar a otro usuario. El alcance lo da UserViewSet.get_queryset
+    (tenant o cafetería); aquí se limita qué cuentas puede tocar el admin de cafetería.
+    """
+    message = "No puedes gestionar a este usuario."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and
+            request.user.role in CREADORES_DE_USUARIOS
+        )
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if obj.pk == user.pk:
+            # Nadie se desactiva a sí mismo (su perfil lo edita con IsOwnUser)
+            self.message = "No puedes gestionar tu propia cuenta desde aquí."
+            return False
+        if user.role == 'super_admin':
+            return True
+        if user.role == 'distribuidor_admin':
+            return user.tenant_id == obj.tenant_id
+        if user.role == 'cafe_admin':
+            return (
+                obj.role in PERSONAL_DE_CAFETERIA and
+                obj.tenant_id == user.tenant_id and
+                obj.cafeteria_id is not None and
+                obj.cafeteria_id == user.cafeteria_id
+            )
+        return False
 
 
 class IsTenantOwner(permissions.BasePermission):

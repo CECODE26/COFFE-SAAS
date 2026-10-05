@@ -158,7 +158,8 @@ curl -X POST http://localhost:8000/api/v1/tenants/ \
   -d '{
     "name": "Distribuidora Quito",
     "email": "info@quito.com",
-    "ruc": "1234567891",
+    "ruc": "1791234567001",
+    "plan": "basic",
     "business_name": "Distribuidora Quito S.A.",
     "phone": "+593987654321"
   }'
@@ -166,16 +167,18 @@ curl -X POST http://localhost:8000/api/v1/tenants/ \
 
 ### Registro de Distribuidor
 
-**Autoregistro**
+**Distribuidor y su administrador en un paso** (solo super admin; no hay registro público ni plan gratis)
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/register/ \
+  -H "Authorization: Bearer <access_token_super_admin>" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "nuevo@distribuidor.com",
     "password": "SecurePass123",
     "password2": "SecurePass123",
     "distribuidor_name": "Mi Distribuidora",
-    "ruc": "1234567892",
+    "plan": "basic",
+    "ruc": "1792345678001",
     "business_name": "Mi Distribuidora S.A.",
     "first_name": "Carlos",
     "last_name": "Rodríguez",

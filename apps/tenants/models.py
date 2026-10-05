@@ -3,6 +3,18 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
+# Límites de cada plan. Los usan la creación del distribuidor, el cambio de plan y los datos demo.
+LIMITES_POR_PLAN = {
+    'free': {'max_cafes': 1, 'max_users': 10},
+    'basic': {'max_cafes': 5, 'max_users': 50},
+    'pro': {'max_cafes': 20, 'max_users': 500},
+    'enterprise': {'max_cafes': 999, 'max_users': 9999},
+}
+
+# Planes que se venden hoy (el negocio no tiene plan gratis; 'free' queda solo por datos antiguos)
+PLANES_DE_PAGO = ('basic', 'pro', 'enterprise')
+
+
 class Tenant(models.Model):
     """Distribuidor de cafeterías - Multi-tenant container"""
 
@@ -37,9 +49,10 @@ class Tenant(models.Model):
     logo = models.ImageField(_('Logo'), upload_to='tenants/logos/', null=True, blank=True)
 
     # Plan & Billing
-    plan = models.CharField(_('Plan'), max_length=20, choices=PLAN_CHOICES, default='free')
-    max_cafes = models.IntegerField(_('Máximo de Cafeterías'), default=1)
-    max_users = models.IntegerField(_('Máximo de Usuarios'), default=10)
+    # Sin plan gratis: lo que se cree sin indicar plan (admin de Django, scripts) arranca en Básico
+    plan = models.CharField(_('Plan'), max_length=20, choices=PLAN_CHOICES, default='basic')
+    max_cafes = models.IntegerField(_('Máximo de Cafeterías'), default=LIMITES_POR_PLAN['basic']['max_cafes'])
+    max_users = models.IntegerField(_('Máximo de Usuarios'), default=LIMITES_POR_PLAN['basic']['max_users'])
 
     # Status
     status = models.CharField(_('Estado'), max_length=20, choices=STATUS_CHOICES, default='active')

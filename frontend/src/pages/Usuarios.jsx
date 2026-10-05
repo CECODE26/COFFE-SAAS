@@ -33,6 +33,9 @@ const GROUPS = {
 export const Usuarios = () => {
   const { user } = useAuth();
   const isSuper = user?.role === 'super_admin';
+  // El admin de cafetería solo ve su local: la columna "Local" repetiría siempre el mismo nombre
+  const showLocal = isSuper || user?.role === 'distribuidor_admin';
+  const searchLabel = showLocal ? 'Buscar por nombre, email o local' : 'Buscar por nombre o email';
   const [users, setUsers] = useState([]);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -52,9 +55,10 @@ export const Usuarios = () => {
     return users.filter((u) => {
       if (filter !== 'all' && !GROUPS[filter].includes(u.role)) return false;
       if (!q) return true;
-      return [u.full_name, u.email, u.cafeteria_name, u.tenant_name].some((v) => v?.toLowerCase().includes(q));
+      const campos = showLocal ? [u.full_name, u.email, u.cafeteria_name, u.tenant_name] : [u.full_name, u.email];
+      return campos.some((v) => v?.toLowerCase().includes(q));
     });
-  }, [users, filter, query]);
+  }, [users, filter, query, showLocal]);
 
   return (
     <Layout>
@@ -63,7 +67,7 @@ export const Usuarios = () => {
       ) : (
         <>
           <PageHeader
-            eyebrow={isSuper ? 'Plataforma' : user?.tenant_name}
+            eyebrow={isSuper ? 'Plataforma' : user?.cafeteria_name || user?.tenant_name}
             title={isSuper ? 'Usuarios' : 'Equipo'}
             subtitle={`${users.filter((u) => u.is_active).length} cuentas activas de ${users.length}.`}
             actions={
@@ -90,8 +94,8 @@ export const Usuarios = () => {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre, email o local…"
-              aria-label="Buscar por nombre, email o local"
+              placeholder={`${searchLabel}…`}
+              aria-label={searchLabel}
               className="input !rounded-full !py-2.5 pl-11"
             />
           </div>
@@ -101,12 +105,14 @@ export const Usuarios = () => {
           ) : (
             <Card padded={false} className="overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
+                <table className={`w-full text-sm ${showLocal ? 'min-w-[720px]' : 'min-w-[560px]'}`}>
                   <thead>
                     <tr className="border-b border-oro-300/60 bg-crema/70 text-left text-[11px] uppercase tracking-[0.18em] text-verde-600">
                       <th className="px-6 py-3 font-medium">Persona</th>
                       <th className="px-3 py-3 font-medium">Rol</th>
-                      <th className="px-3 py-3 font-medium">{isSuper ? 'Distribuidor / local' : 'Local'}</th>
+                      {showLocal && (
+                        <th className="px-3 py-3 font-medium">{isSuper ? 'Distribuidor / local' : 'Local'}</th>
+                      )}
                       <th className="px-3 py-3 font-medium">Alta</th>
                       <th className="px-6 py-3 font-medium">Estado</th>
                     </tr>
@@ -128,13 +134,15 @@ export const Usuarios = () => {
                             {ROLE_LABELS[u.role] || u.role}
                           </Badge>
                         </td>
-                        <td className="px-3 py-3.5 text-verde-600">
-                          {isSuper && u.tenant_name && (
-                            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-oro-600">{u.tenant_name}</p>
-                          )}
-                          {/* Los admins de plataforma y de red no dependen de un local: se muestra su alcance */}
-                          <p>{SCOPE_LABELS[u.role] || u.cafeteria_name || '—'}</p>
-                        </td>
+                        {showLocal && (
+                          <td className="px-3 py-3.5 text-verde-600">
+                            {isSuper && u.tenant_name && (
+                              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-oro-600">{u.tenant_name}</p>
+                            )}
+                            {/* Los admins de plataforma y de red no dependen de un local: se muestra su alcance */}
+                            <p>{SCOPE_LABELS[u.role] || u.cafeteria_name || '—'}</p>
+                          </td>
+                        )}
                         <td className="px-3 py-3.5 text-verde-600">
                           {new Date(u.created_at).toLocaleDateString('es-EC', { day: 'numeric', month: 'short' })}
                         </td>

@@ -88,7 +88,7 @@ La aplicación usa JWT tokens. Los tokens se almacenan en localStorage y se env�
 **Endpoints de Auth:**
 - `POST /auth/login/` - Login
 - `POST /auth/refresh/` - Refresh token
-- `POST /auth/register/` - Registro
+- `POST /auth/register/` - Alta de distribuidor con su administrador (solo super admin; el panel usa `/tenants/` y `/auth/users/`)
 
 ## 📱 Páginas Disponibles
 

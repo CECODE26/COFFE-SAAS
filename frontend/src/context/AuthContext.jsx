@@ -50,35 +50,12 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
-  const register = useCallback(async (data) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.post('/auth/register/', data);
-      const { access, refresh, user: userData } = response.data;
-
-      localStorage.setItem('access_token', access);
-      localStorage.setItem('refresh_token', refresh);
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      setUser(userData);
-      return userData;
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail || 'Registration failed';
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const value = {
     user,
     loading,
     error,
     login,
     logout,
-    register,
     isAuthenticated: !!user,
   };
 

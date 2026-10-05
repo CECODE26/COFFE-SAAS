@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
+from django.db import transaction
 from .models import User
+from .permissions import PERSONAL_DE_CAFETERIA
 from apps.tenants.models import Tenant
 
 
@@ -34,10 +36,16 @@ class UserCreateSerializer(serializers.ModelSerializer):
     # Solo el super admin lo envía; el distribuidor usa su propio tenant
     tenant = serializers.PrimaryKeyRelatedField(queryset=Tenant.objects.all(), required=False, allow_null=True)
 
-    # Roles que puede asignar cada tipo de administrador
+    # Quién crea a quién (espejo en frontend/src/components/UserForm.jsx):
+    # el distribuidor solo da de alta Admin Cafetería y este, el personal de su local.
     ASSIGNABLE_ROLES = {
         'super_admin': [r for r, _ in User.ROLE_CHOICES],
-        'distribuidor_admin': ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero', 'usuario'],
+        'distribuidor_admin': ['cafe_admin'],
+        'cafe_admin': list(PERSONAL_DE_CAFETERIA),
+    }
+    ROLE_ERRORS = {
+        'distribuidor_admin': 'Como distribuidor solo puedes crear usuarios Admin Cafetería.',
+        'cafe_admin': 'Solo puedes crear gerente, camarero, cajero o cocinero para tu cafetería.',
     }
     # Roles que trabajan dentro de un local
     CAFE_ROLES = ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero']
@@ -50,6 +58,16 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'language', 'timezone'
         ]
         read_only_fields = ['id']
+
+    def to_internal_value(self, data):
+        # Tenant (y local, para el admin de cafetería) los pone el backend: lo que mande el cliente se ignora
+        creator = self.context['request'].user
+        if creator.role != 'super_admin' and hasattr(data, 'copy'):
+            data = data.copy()
+            data.pop('tenant', None)
+            if creator.role == 'cafe_admin':
+                data.pop('cafeteria', None)
+        return super().to_internal_value(data)
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
@@ -66,7 +84,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
         role = attrs.get('role', 'usuario')
 
         if role not in self.ASSIGNABLE_ROLES.get(creator.role, []):
-            raise serializers.ValidationError({'role': 'No puedes asignar este rol.'})
+            raise serializers.ValidationError(
+                {'role': self.ROLE_ERRORS.get(creator.role, 'No puedes asignar este rol.')}
+            )
 
         if creator.role == 'super_admin':
             tenant = attrs.get('tenant')
@@ -75,8 +95,15 @@ class UserCreateSerializer(serializers.ModelSerializer):
             if role == 'super_admin':
                 tenant = None
         else:
+            # Distribuidor y admin de cafetería crean siempre dentro de su propio tenant
             tenant = creator.tenant
         attrs['tenant'] = tenant
+
+        if creator.role == 'cafe_admin':
+            # Su personal va siempre a su cafetería, mande lo que mande el cliente
+            attrs['cafeteria'] = creator.cafeteria
+            if not creator.cafeteria_id:
+                raise serializers.ValidationError({'cafeteria': 'Tu cuenta no tiene una cafetería asignada.'})
 
         cafeteria = attrs.get('cafeteria')
         if role in self.CAFE_ROLES and not cafeteria:
@@ -136,7 +163,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class DistribuidorRegistrationSerializer(serializers.Serializer):
-    """Registro de nuevo Distribuidor"""
+    """
+    Alta de un distribuidor junto con su administrador en una sola llamada (solo super admin).
+    El distribuidor pasa por las mismas reglas que en la consola (TenantCreateSerializer):
+    plan de pago, RUC válido, nombre único y slug libre.
+    """
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
@@ -145,57 +176,53 @@ class DistribuidorRegistrationSerializer(serializers.Serializer):
     distribuidor_name = serializers.CharField(max_length=255)
     ruc = serializers.CharField(max_length=20)
     business_name = serializers.CharField(max_length=255)
+    plan = serializers.CharField(required=False, default='basic')
 
     # First user (Admin)
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
-    phone = serializers.CharField(max_length=20, required=False)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Este email ya está registrado.")
-        return value
-
-    def validate_ruc(self, value):
-        if Tenant.objects.filter(ruc=value).exists():
-            raise serializers.ValidationError("Este RUC ya está registrado.")
-        return value
+        return value.lower()
 
     def validate(self, attrs):
         if attrs['password'] != attrs.pop('password2'):
             raise serializers.ValidationError(
                 {'password': 'Las contraseñas no coinciden.'}
             )
+
+        from apps.tenants.serializers import TenantCreateSerializer
+        tenant_serializer = TenantCreateSerializer(data={
+            'name': attrs['distribuidor_name'],
+            'business_name': attrs['business_name'],
+            'ruc': attrs['ruc'],
+            'email': attrs['email'],
+            'phone': attrs.get('phone', ''),
+            'plan': attrs['plan'],
+        }, context=self.context)
+        if not tenant_serializer.is_valid():
+            errores = dict(tenant_serializer.errors)
+            if 'name' in errores:
+                errores['distribuidor_name'] = errores.pop('name')
+            raise serializers.ValidationError(errores)
+        attrs['tenant_serializer'] = tenant_serializer
         return attrs
 
     def create(self, validated_data):
-        # Create Tenant
-        from django.utils.text import slugify
-
-        tenant = Tenant.objects.create(
-            name=validated_data['distribuidor_name'],
-            slug=slugify(validated_data['distribuidor_name']),
-            email=validated_data['email'],
-            ruc=validated_data['ruc'],
-            business_name=validated_data['business_name'],
-            phone=validated_data.get('phone', ''),
-            plan='free',
-            max_cafes=1,
-            max_users=10,
-        )
-
-        # Create Admin User
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            password=validated_data['password'],
-            phone=validated_data.get('phone', ''),
-            role='distribuidor_admin',
-            tenant=tenant,
-            is_staff=True,
-        )
-
+        with transaction.atomic():
+            tenant = validated_data['tenant_serializer'].save()
+            user = User.objects.create_user(
+                email=validated_data['email'],
+                first_name=validated_data['first_name'],
+                last_name=validated_data['last_name'],
+                password=validated_data['password'],
+                phone=validated_data.get('phone', ''),
+                role='distribuidor_admin',
+                tenant=tenant,
+            )
         return {'tenant': tenant, 'user': user}
 
 

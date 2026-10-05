@@ -26,7 +26,7 @@ api.interceptors.request.use((config) => {
 });
 
 // Endpoints de autenticación: un 401 aquí es un error del formulario, no una sesión vencida
-const AUTH_ENDPOINTS = ['/auth/login/', '/auth/refresh/', '/auth/register/'];
+const AUTH_ENDPOINTS = ['/auth/login/', '/auth/refresh/'];
 
 // Sesión perdida o vencida: limpiamos y mandamos al login con aviso.
 // Devolvemos una promesa que no se resuelve para que la pantalla no muestre
