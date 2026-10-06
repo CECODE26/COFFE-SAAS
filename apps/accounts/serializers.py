@@ -1,10 +1,14 @@
+from collections.abc import Mapping
+
 from rest_framework import serializers
+from rest_framework.fields import empty
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from .models import User
 from .permissions import PERSONAL_DE_CAFETERIA
 from apps.tenants.models import Tenant
+from apps.tenants.serializers import NuevoDistribuidorSerializer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -35,6 +39,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES, default='usuario')
     # Solo el super admin lo envía; el distribuidor usa su propio tenant
     tenant = serializers.PrimaryKeyRelatedField(queryset=Tenant.objects.all(), required=False, allow_null=True)
+    # En lugar de `tenant`, solo super admin y rol Distribuidor: la empresa se crea junto con la cuenta.
+    # {name, business_name, ruc} y, opcionales, email y phone (por defecto los de la cuenta).
+    nuevo_distribuidor = NuevoDistribuidorSerializer(required=False, allow_null=True, write_only=True)
 
     # Quién crea a quién (espejo en frontend/src/components/UserForm.jsx):
     # el distribuidor solo da de alta Admin Cafetería y este, el personal de su local.
@@ -54,14 +61,46 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'phone',
-            'password', 'password2', 'role', 'tenant', 'cafeteria',
+            'password', 'password2', 'role', 'tenant', 'nuevo_distribuidor', 'cafeteria',
             'language', 'timezone'
         ]
         read_only_fields = ['id']
 
+    @staticmethod
+    def _revisar_nuevo_distribuidor(creator, role, tenant):
+        """Un distribuidor nuevo solo lo crea el super admin, para una cuenta Distribuidor y en lugar de elegir uno existente"""
+        if creator.role != 'super_admin':
+            raise serializers.ValidationError(
+                {'nuevo_distribuidor': 'Solo el super administrador puede crear distribuidores.'}
+            )
+        if role != 'distribuidor_admin':
+            raise serializers.ValidationError(
+                {'nuevo_distribuidor': 'Un distribuidor nuevo solo se crea junto con una cuenta de rol Distribuidor.'}
+            )
+        if tenant is not empty and tenant not in (None, ''):
+            raise serializers.ValidationError(
+                {'non_field_errors': 'Elige un distribuidor existente o crea uno nuevo, no ambos.'}
+            )
+
+    def _revisar_antes_de_validar(self, data, creator):
+        """
+        Primera barrera, antes de validar los campos: así nadie más llega a consultar si un nombre o un RUC
+        ya están registrados. Cada valor se lee como lo leerá DRF (get_value del campo): en JSON la empresa es
+        un objeto; en un formulario (multipart o urlencoded) llega en claves "nuevo_distribuidor.<campo>".
+        """
+        if not isinstance(data, Mapping):
+            return  # DRF responde que los datos no son válidos
+        nuevo = self.fields['nuevo_distribuidor'].get_value(data)
+        if nuevo is empty or nuevo in (None, ''):
+            return
+        self._revisar_nuevo_distribuidor(
+            creator, self.fields['role'].get_value(data), self.fields['tenant'].get_value(data),
+        )
+
     def to_internal_value(self, data):
         # Tenant (y local, para el admin de cafetería) los pone el backend: lo que mande el cliente se ignora
         creator = self.context['request'].user
+        self._revisar_antes_de_validar(data, creator)
         if creator.role != 'super_admin' and hasattr(data, 'copy'):
             data = data.copy()
             data.pop('tenant', None)
@@ -83,6 +122,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
         creator = self.context['request'].user
         role = attrs.get('role', 'usuario')
 
+        nuevo = attrs.get('nuevo_distribuidor')
+        if nuevo:
+            # Segunda barrera, ya con los datos validados (la primera está en to_internal_value)
+            self._revisar_nuevo_distribuidor(creator, role, attrs.get('tenant'))
+
         if role not in self.ASSIGNABLE_ROLES.get(creator.role, []):
             raise serializers.ValidationError(
                 {'role': self.ROLE_ERRORS.get(creator.role, 'No puedes asignar este rol.')}
@@ -90,8 +134,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         if creator.role == 'super_admin':
             tenant = attrs.get('tenant')
-            if role != 'super_admin' and not tenant:
-                raise serializers.ValidationError({'tenant': 'Selecciona un distribuidor.'})
+            if role != 'super_admin' and not tenant and not nuevo:
+                raise serializers.ValidationError({'tenant': (
+                    'Selecciona un distribuidor o crea uno nuevo.' if role == 'distribuidor_admin'
+                    else 'Selecciona un distribuidor.'
+                )})
             if role == 'super_admin':
                 tenant = None
         else:
@@ -117,16 +164,42 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'non_field_errors': f'{tenant.name} alcanzó el límite de {tenant.max_users} usuarios de su plan.'}
             )
+
+        if nuevo:
+            # Contacto de la empresa: si no se indica otro, el de su primera cuenta
+            nuevo['email'] = nuevo.get('email') or attrs['email']
+            nuevo['phone'] = nuevo.get('phone') or attrs.get('phone', '')
+        else:
+            attrs.pop('nuevo_distribuidor', None)
         return attrs
+
+    def _crear_distribuidor(self, datos):
+        """La empresa con las reglas de la consola (slug libre, choques de RUC o nombre en la base)"""
+        try:
+            return NuevoDistribuidorSerializer(context=self.context).create(datos)
+        except serializers.ValidationError as error:
+            # Dos altas con el mismo RUC o nombre a la vez: el error va al campo de la empresa
+            raise serializers.ValidationError({'nuevo_distribuidor': error.detail})
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        return User.objects.create_user(
-            password=password,
-            is_staff=validated_data.get('role') == 'super_admin',
-            is_superuser=validated_data.get('role') == 'super_admin',
-            **validated_data,
-        )
+        nuevo = validated_data.pop('nuevo_distribuidor', None)
+        try:
+            # Empresa y cuenta juntas: si la cuenta falla no queda un distribuidor a medias
+            with transaction.atomic():
+                if nuevo:
+                    validated_data['tenant'] = self._crear_distribuidor(nuevo)
+                return User.objects.create_user(
+                    password=password,
+                    is_staff=validated_data.get('role') == 'super_admin',
+                    is_superuser=validated_data.get('role') == 'super_admin',
+                    **validated_data,
+                )
+        except IntegrityError:
+            # Dos altas con el mismo email a la vez: la segunda choca en la base
+            if User.objects.filter(email__iexact=validated_data['email']).exists():
+                raise serializers.ValidationError({'email': 'Este email ya está registrado.'})
+            raise
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -42,13 +43,19 @@ class TenantViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == 'super_admin':
-            return Tenant.objects.all()
+            queryset = Tenant.objects.all()
+        elif user.role == 'distribuidor_admin':
+            queryset = Tenant.objects.filter(id=user.tenant_id)
+        else:
+            # Otros usuarios no pueden listar tenants
+            return Tenant.objects.none()
 
-        if user.role == 'distribuidor_admin':
-            return Tenant.objects.filter(id=user.tenant_id)
-
-        # Otros usuarios no pueden listar tenants
-        return Tenant.objects.none()
+        if self.action == 'list':
+            # Cuentas Distribuidor de cada uno en la misma consulta (TenantListSerializer.admins_count)
+            queryset = queryset.annotate(
+                admins_count=Count('users', filter=Q(users__role='distribuidor_admin'))
+            )
+        return queryset
 
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):

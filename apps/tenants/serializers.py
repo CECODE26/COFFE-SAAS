@@ -10,13 +10,15 @@ from .models import LIMITES_POR_PLAN, PLANES_DE_PAGO, Tenant
 class TenantListSerializer(serializers.ModelSerializer):
     active_cafes_count = serializers.SerializerMethodField()
     active_users_count = serializers.SerializerMethodField()
+    # Cuentas Distribuidor (activas o no): con 0, el formulario de usuarios lo marca "(sin cuenta)"
+    admins_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Tenant
         fields = [
             'id', 'name', 'slug', 'email', 'phone',
             'business_name', 'plan', 'status',
-            'active_cafes_count', 'active_users_count',
+            'active_cafes_count', 'active_users_count', 'admins_count',
             'max_cafes', 'max_users', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
@@ -26,6 +28,13 @@ class TenantListSerializer(serializers.ModelSerializer):
 
     def get_active_users_count(self, obj):
         return obj.get_active_users_count()
+
+    def get_admins_count(self, obj):
+        # La lista lo trae anotado en la misma consulta (TenantViewSet.get_queryset); si no, se cuenta aquí
+        anotado = getattr(obj, 'admins_count', None)
+        if anotado is not None:
+            return anotado
+        return obj.users.filter(role='distribuidor_admin').count()
 
 
 class TenantDetailSerializer(serializers.ModelSerializer):
@@ -165,6 +174,22 @@ class TenantCreateSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         # La respuesta trae la ficha completa (id, plan, límites, estado…) para pintarla sin recargar
         return TenantDetailSerializer(instance, context=self.context).data
+
+
+class NuevoDistribuidorSerializer(TenantCreateSerializer):
+    """
+    Empresa que se crea junto con su primera cuenta Distribuidor desde Nuevo usuario
+    (campo nuevo_distribuidor de UserCreateSerializer). Mismas reglas que la consola: nombre y RUC
+    únicos, RUC válido y slug libre. Email y teléfono de contacto son opcionales (quien lo usa pone
+    los de la cuenta) y el plan no se elige: queda el del modelo.
+    """
+    email = serializers.EmailField(required=False, allow_blank=True, error_messages={
+        'invalid': 'Escribe un email válido.',
+    })
+    plan = serializers.HiddenField(default=Tenant._meta.get_field('plan').get_default())
+
+    class Meta(TenantCreateSerializer.Meta):
+        fields = ['name', 'business_name', 'ruc', 'email', 'phone', 'plan']
 
 
 class TenantUpdateSerializer(serializers.ModelSerializer):

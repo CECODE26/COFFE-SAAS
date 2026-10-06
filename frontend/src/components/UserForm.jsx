@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Modal, Field, FormAlert, parseApiErrors } from './Form';
 import { Button } from './Button';
 import { ROLE_LABELS } from '../lib/roles';
-import { Eye, EyeOff, Wand2, Network, Plus, Store } from 'lucide-react';
+import { Eye, EyeOff, Wand2, Network, Plus, Store, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { fetchAll } from '../services/api';
 
@@ -41,8 +41,24 @@ const defaultRole = (assignable, wanted) => {
   return assignable[0] || '';
 };
 
+// Valor del select "Distribuidor" que crea la empresa junto con la cuenta (solo super admin, rol Distribuidor)
+const NUEVO = 'nuevo';
+const RUC_LEN = 13;
+const EMPRESA_VACIA = { name: '', business_name: '', ruc: '' };
+// Campos de la empresa con su error en el formulario; los demás errores de la empresa van al aviso general
+const CAMPOS_EMPRESA = Object.keys(EMPRESA_VACIA);
+
+// Distribuidor al elegir rol. Para Distribuidor: el que se tenía la última vez con ese rol (p. ej. el que
+// llegó desde Plataforma) o, si no, el nuevo. Los demás roles no pueden crearlo
+const tenantAlElegirRol = (role, actual, recordado) => {
+  if (role === 'distribuidor_admin') return recordado || NUEVO;
+  return actual === NUEVO ? '' : actual;
+};
+
 const EMPTY = {
   tenant: '',
+  // Distribuidor elegido con el rol Distribuidor, para devolverlo al volver a ese rol
+  tenantDistribuidor: '',
   role: '',
   cafeteria: '',
   first_name: '',
@@ -51,6 +67,25 @@ const EMPTY = {
   phone: '',
   password: '',
   password2: '',
+  empresa: EMPRESA_VACIA,
+};
+
+// Los errores de la empresa llegan anidados ({ nuevo_distribuidor: { ruc: [...] } }): se pasan a
+// empresa_<campo> para pintarlos en su campo
+const separarErroresEmpresa = ({ fields, general }) => {
+  const { nuevo_distribuidor: empresa, ...resto } = fields;
+  if (empresa === undefined) return { fields, general };
+  let aviso = general;
+  if (empresa && typeof empresa === 'object') {
+    Object.entries(empresa).forEach(([campo, valor]) => {
+      const msg = Array.isArray(valor) ? valor[0] : valor;
+      if (CAMPOS_EMPRESA.includes(campo)) resto[`empresa_${campo}`] = msg;
+      else aviso = aviso || msg;
+    });
+  } else {
+    aviso = aviso || empresa;
+  }
+  return { fields: resto, general: aviso };
 };
 
 const randomPassword = () => {
@@ -75,13 +110,22 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState({ fields: {}, general: null });
   const [saving, setSaving] = useState(false);
+  const formRef = useRef(null);
+  // Tras pintar los errores (del navegador o del backend) el foco va al primer campo marcado: así el lector
+  // de pantalla lo lee y se corrige sin buscarlo. Si el error es solo general, lo muestra FormAlert
+  const [focusError, setFocusError] = useState(0);
+
+  useEffect(() => {
+    if (focusError) formRef.current?.querySelector('[aria-invalid="true"]')?.focus();
+  }, [focusError]);
 
   useEffect(() => {
     if (!open) return;
+    const role = defaultRole(assignable, initialRole);
     setForm({
       ...EMPTY,
-      role: defaultRole(assignable, initialRole),
-      tenant: isSuper && initialTenant ? initialTenant : '',
+      role,
+      tenant: isSuper ? initialTenant || tenantAlElegirRol(role, '', '') : '',
     });
     setShowPwd(false);
     setErrors({ fields: {}, general: null });
@@ -107,8 +151,12 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
 
   const needsCafe = CAFE_ROLES.includes(form.role);
   const needsTenant = isSuper && form.role !== 'super_admin';
+  // Rol Distribuidor: el super admin puede crear la empresa aquí mismo (primera opción del select)
+  const canCreateTenant = isSuper && form.role === 'distribuidor_admin';
+  const createsTenant = canCreateTenant && form.tenant === NUEVO;
   // Sin distribuidores no se puede crear nada que dependa de uno: se avisa en lugar de un select vacío
-  const noTenants = needsTenant && loaded.tenants && tenants.length === 0;
+  // (salvo para el rol Distribuidor, que crea el suyo)
+  const noTenants = needsTenant && !canCreateTenant && loaded.tenants && tenants.length === 0;
   // Sin distribuidores tampoco se muestra la cafetería: dependería de un selector que no está
   const pickCafe = needsCafe && !isCafeAdmin && !noTenants;
 
@@ -136,6 +184,27 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
   };
   const err = (key) => errors.fields[key];
 
+  const pickRole = (role) =>
+    setForm((f) => {
+      if (f.role === role || !isSuper) return { ...f, role };
+      const tenantDistribuidor = f.role === 'distribuidor_admin' ? f.tenant : f.tenantDistribuidor;
+      const tenant = tenantAlElegirRol(role, f.tenant, tenantDistribuidor);
+      // Como al cambiar de distribuidor en el select: la cafetería elegida deja de ser válida
+      return { ...f, role, tenant, tenantDistribuidor, ...(tenant !== f.tenant ? { cafeteria: '' } : {}) };
+    });
+
+  // Datos de la empresa; el aviso de error del campo se limpia al corregirlo
+  const setEmpresa = (key) => (e) => {
+    const raw = e.target.value;
+    // El RUC solo admite dígitos (máximo 13). Sin maxLength: al pegar "1790012345-001" primero
+    // se quitan guiones y espacios y luego se recorta
+    const value = key === 'ruc' ? raw.replace(/\D/g, '').slice(0, RUC_LEN) : raw;
+    setForm((f) => ({ ...f, empresa: { ...f.empresa, [key]: value } }));
+    if (errors.fields[`empresa_${key}`]) {
+      setErrors((x) => ({ ...x, fields: { ...x.fields, [`empresa_${key}`]: undefined } }));
+    }
+  };
+
   const generate = () => {
     const pwd = randomPassword();
     setForm((f) => ({ ...f, password: pwd, password2: pwd }));
@@ -144,19 +213,44 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const empresa = {
+      name: form.empresa.name.trim(),
+      business_name: form.empresa.business_name.trim(),
+      ruc: form.empresa.ruc,
+    };
+    if (createsTenant && empresa.ruc.length !== RUC_LEN) {
+      setErrors({
+        fields: { empresa_ruc: `El RUC debe tener exactamente ${RUC_LEN} dígitos (tiene ${empresa.ruc.length}).` },
+        general: null,
+      });
+      setFocusError((n) => n + 1);
+      return;
+    }
     setSaving(true);
     setErrors({ fields: {}, general: null });
     const payload = { ...form, cafeteria: pickCafe ? form.cafeteria || null : null };
+    delete payload.empresa;
+    delete payload.tenantDistribuidor;
+    // Empresa nueva: se crea junto con la cuenta, en lugar de elegir un distribuidor existente
+    if (createsTenant) {
+      delete payload.tenant;
+      payload.nuevo_distribuidor = empresa;
+    }
     if (!needsTenant) delete payload.tenant;
     // El backend pone la cafetería del admin de cafetería
     if (isCafeAdmin) delete payload.cafeteria;
     try {
       const { data } = await api.post('/auth/users/', payload);
-      toast.success(`${data.first_name} ya tiene acceso`);
+      toast.success(
+        createsTenant
+          ? `${empresa.name} ya forma parte de la red y ${data.first_name} tiene acceso`
+          : `${data.first_name} ya tiene acceso`
+      );
       onCreated?.(data);
       onClose();
     } catch (error) {
-      setErrors(parseApiErrors(error));
+      setErrors(separarErroresEmpresa(parseApiErrors(error)));
+      setFocusError((n) => n + 1);
     } finally {
       setSaving(false);
     }
@@ -170,20 +264,32 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
       eyebrow={isSuper ? 'Plataforma' : user?.cafeteria_name || user?.tenant_name}
       title="Nuevo usuario"
       subtitle={
-        isSuper && form.role === 'distribuidor_admin' && selectedTenant
-          ? `Acceso para quien administrará ${selectedTenant.name}.`
-          : CREATOR_SUBTITLES[user?.role] || 'Dale acceso a alguien de tu equipo.'
+        createsTenant
+          ? 'Alta de un distribuidor nuevo y de quien lo administrará.'
+          : canCreateTenant && selectedTenant
+            ? `Acceso para quien administrará ${selectedTenant.name}.`
+            : CREATOR_SUBTITLES[user?.role] || 'Dale acceso a alguien de tu equipo.'
       }
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button type="submit" form="user-form" disabled={saving || noTenants || noCafes || !assignable.length}>
-            {saving ? 'Guardando…' : 'Crear usuario'}
+            {saving ? (
+              'Guardando…'
+            ) : createsTenant ? (
+              <>
+                {/* En móvil basta "Crear" (el subtítulo ya dice qué): así el pie cabe en una fila */}
+                <span className="sm:hidden">Crear</span>
+                <span className="hidden sm:inline">Crear distribuidor</span>
+              </>
+            ) : (
+              'Crear usuario'
+            )}
           </Button>
         </>
       }
     >
-      <form id="user-form" onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} id="user-form" onSubmit={handleSubmit} className="space-y-5">
         <FormAlert>{errors.general}</FormAlert>
 
         {/* Rol: con una sola opción (distribuidor) se muestra fija, sin selector */}
@@ -200,7 +306,7 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
                   key={role}
                   type="button"
                   aria-pressed={form.role === role}
-                  onClick={() => setForm((f) => ({ ...f, role }))}
+                  onClick={() => pickRole(role)}
                   className={`flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
                     form.role === role
                       ? 'border-cobalto-500 bg-cobalto-50 text-cobalto-600 ring-4 ring-cobalto-100'
@@ -244,10 +350,32 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
             {needsTenant && !noTenants && (
               <Field label="Distribuidor" required error={err('tenant')}>
                 <select className="input" value={form.tenant} onChange={set('tenant')} required>
-                  <option value="">Selecciona…</option>
-                  {tenants.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
+                  {canCreateTenant ? (
+                    <>
+                      <option value={NUEVO}>+ Nuevo distribuidor</option>
+                      {/* Abierto con un distribuidor ya elegido (p. ej. desde Plataforma) mientras llega la lista */}
+                      {!loaded.tenants && form.tenant && form.tenant !== NUEVO && (
+                        <option value={form.tenant}>Cargando…</option>
+                      )}
+                      {tenants.length > 0 && (
+                        <optgroup label="Distribuidores existentes">
+                          {tenants.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                              {t.admins_count === 0 ? ' (sin cuenta)' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <option value="">Selecciona…</option>
+                      {tenants.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </Field>
             )}
@@ -278,6 +406,65 @@ export const UserForm = ({ open, onClose, onCreated, initialRole, initialTenant 
                 </select>
               </Field>
             )}
+          </div>
+        )}
+
+        {createsTenant && (
+          <div
+            role="group"
+            aria-labelledby="empresa-nueva-titulo"
+            className="rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 sm:p-5"
+          >
+            <p id="empresa-nueva-titulo" className="flex items-center gap-2.5 font-serif text-lg italic font-medium text-verde-700">
+              <Building2 className="h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" />
+              Empresa
+            </p>
+            <p className="mb-4 mt-1 text-xs text-verde-600">
+              Al guardar se crean a la vez la empresa y su cuenta de acceso. El email y el teléfono de la cuenta
+              quedan como contacto de la empresa.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Nombre comercial" required error={err('empresa_name')}>
+                <input
+                  className="input"
+                  value={form.empresa.name}
+                  onChange={setEmpresa('name')}
+                  placeholder="p. ej. Café Cotopaxi"
+                  required
+                  autoComplete="off"
+                />
+              </Field>
+              <Field label="Razón social" required error={err('empresa_business_name')}>
+                <input
+                  className="input"
+                  value={form.empresa.business_name}
+                  onChange={setEmpresa('business_name')}
+                  placeholder="p. ej. Café Cotopaxi Cía. Ltda."
+                  required
+                  autoComplete="off"
+                />
+              </Field>
+              <Field
+                label="RUC"
+                required
+                error={err('empresa_ruc')}
+                hint={
+                  form.empresa.ruc && form.empresa.ruc.length < RUC_LEN
+                    ? `${form.empresa.ruc.length} de ${RUC_LEN} dígitos`
+                    : `${RUC_LEN} dígitos`
+                }
+              >
+                <input
+                  className="input tabular-nums"
+                  value={form.empresa.ruc}
+                  onChange={setEmpresa('ruc')}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="1790012345001"
+                  required
+                />
+              </Field>
+            </div>
           </div>
         )}
 
