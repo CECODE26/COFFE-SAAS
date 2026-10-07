@@ -99,7 +99,8 @@ export const Modal = ({ open, onClose, eyebrow, title, subtitle, children, foote
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="flex items-center gap-3 px-5 sm:px-7" aria-hidden="true">
+        {/* py-0.5: el rombo girado mide ~11 px; así no asoma sobre el contenido cuando este se desplaza */}
+        <div className="flex items-center gap-3 px-5 py-0.5 sm:px-7" aria-hidden="true">
           <span className="h-px flex-1 bg-oro-300/70" />
           <span className="rombo" />
           <span className="h-px flex-1 bg-oro-300/70" />

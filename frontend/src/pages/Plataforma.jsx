@@ -4,10 +4,10 @@ import { Layout, PageHeader, Loader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Badge } from '../components/StatusBadge';
 import { Button } from '../components/Button';
-import { StatTile, UsageBar, Avatar, money } from '../components/Stats';
+import { StatTile, Avatar, money } from '../components/Stats';
 import { TenantForm } from '../components/TenantForm';
 import { UserForm } from '../components/UserForm';
-import { PLAN_LABELS, PLANES_DE_PAGO } from '../lib/roles';
+import { PLAN_COLOR, precio } from '../lib/planes';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Network, Store, Users, CircleDollarSign, ArrowUpRight, Power, MoreHorizontal, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,9 +19,8 @@ const TENANT_STATUS = {
   suspended: ['terracotta', 'Suspendido'],
 };
 
-// Paleta "Pistacho y oro" por plan: pistacho, cobalto, oro y verde bosque
-const PLAN_TONE = { free: 'neutral', basic: 'slate', pro: 'brass', enterprise: 'sage' };
-const PLAN_COLOR = { free: '#BFD8A5', basic: '#22409A', pro: '#C39B45', enterprise: '#2A4520' };
+// Barras de volumen: cobalto si el distribuidor está activo, pistacho si no
+const BAR_COLOR = { active: '#22409A', other: '#BFD8A5' };
 
 // Título de sección con antetítulo manuscrito
 const SectionTitle = ({ script, title, subtitle }) => (
@@ -35,6 +34,8 @@ const SectionTitle = ({ script, title, subtitle }) => (
 export const Plataforma = () => {
   const [tenants, setTenants] = useState([]);
   const [cafes, setCafes] = useState([]);
+  // Cafeterías activas por plan e ingreso mensual estimado (GET /cafeterias/resumen_planes/)
+  const [planes, setPlanes] = useState(null);
   const [orders, setOrders] = useState([]);
   // Usuarios de la plataforma: activos (como la tabla) y total de cuentas
   const [users, setUsers] = useState({ active: 0, total: 0 });
@@ -53,14 +54,16 @@ export const Plataforma = () => {
   }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
-    const [t, c, o, u] = await Promise.all([
+    const [t, c, o, u, p] = await Promise.all([
       fetchAll('/tenants/'),
       fetchAll('/cafeterias/'),
       fetchAll('/pedidos/orders/'),
       fetchAll('/auth/users/'),
+      api.get('/cafeterias/resumen_planes/'),
     ]);
     setTenants(t);
     setCafes(c);
+    setPlanes(p.data);
     setOrders(o);
     setUsers({ active: u.filter((x) => x.is_active).length, total: u.length });
   }, []);
@@ -86,21 +89,17 @@ export const Plataforma = () => {
   const activeTenants = tenants.filter((t) => t.status === 'active').length;
 
   const chartData = tenants
-    .map((t) => ({ name: t.name, value: Math.round((salesByTenant[t.id] || 0) * 100) / 100, plan: t.plan }))
+    .map((t) => ({ name: t.name, value: Math.round((salesByTenant[t.id] || 0) * 100) / 100, active: t.status === 'active' }))
     .sort((a, b) => b.value - a.value);
 
-  // No hay plan gratis: solo aparece si queda alguna cuenta antigua en él
-  const planCounts = Object.keys(PLAN_LABELS)
-    .map((p) => ({ plan: p, count: tenants.filter((t) => t.plan === p).length }))
-    .filter(({ plan, count }) => plan !== 'free' || count > 0);
+  const planRows = planes?.planes || [];
+  const activeByPlan = planes?.cafeterias_activas || 0;
 
   const runAction = async (fn, ok) => {
     setOpenMenu(null);
     try {
-      const res = await fn();
+      await fn();
       toast.success(ok);
-      // Bajar a un plan con menos cupo del que ya usa se permite, pero el backend avisa
-      if (res?.data?.aviso) toast(res.data.aviso, { duration: 8000 });
       await load();
     } catch (error) {
       const data = error?.response?.data;
@@ -135,7 +134,7 @@ export const Plataforma = () => {
           {/* Distribuidores */}
           <Card padded={false} className="mb-6">
             <div className="flex flex-wrap items-end justify-between gap-3 p-6 pb-4">
-              <SectionTitle script="La red" title="Distribuidores" subtitle="Plan, límites de uso y estado de cada cuenta" />
+              <SectionTitle script="La red" title="Distribuidores" subtitle="Cafeterías, equipo, volumen y estado de cada cuenta" />
               <Link to="/cafeterias" className="enlace gap-1.5">
                 Ver cafeterías <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
@@ -144,11 +143,10 @@ export const Plataforma = () => {
             {/* relative: contiene el "Acciones" sr-only (absolute); sin esto se escapaba del scroll
                 y ensanchaba toda la página en móvil, y el modal de alta salía cortado */}
             <div className="relative overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-y border-oro-300/60 bg-crema/70 text-left text-[11px] uppercase tracking-[0.18em] text-verde-600">
                     <th className="px-6 py-3 font-medium">Distribuidor</th>
-                    <th className="px-3 py-3 font-medium">Plan</th>
                     <th className="px-3 py-3 font-medium">Cafeterías</th>
                     <th className="px-3 py-3 font-medium">Usuarios</th>
                     <th className="px-3 py-3 text-right font-medium">Volumen</th>
@@ -161,7 +159,7 @@ export const Plataforma = () => {
                 <tbody className="divide-y divide-oro-200/60">
                   {tenants.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center">
+                      <td colSpan={6} className="px-6 py-10 text-center">
                         <p className="font-serif text-xl italic text-verde-700">Todavía no hay distribuidores</p>
                         <p className="mt-1 text-sm text-verde-600">Crea el primero y luego su administrador.</p>
                         <Button size="sm" variant="secondary" className="mt-4" onClick={() => setCreatingTenant(true)}>
@@ -184,13 +182,12 @@ export const Plataforma = () => {
                           </div>
                         </td>
                         <td className="px-3 py-4">
-                          <Badge tone={PLAN_TONE[t.plan]} dot={false}>{PLAN_LABELS[t.plan]}</Badge>
+                          <span className="font-serif text-base italic text-verde-700">{t.active_cafes_count}</span>
+                          <span className="ml-1.5 text-[11px] text-verde-600">{t.active_cafes_count === 1 ? 'abierta' : 'abiertas'}</span>
                         </td>
-                        <td className="w-36 px-3 py-4">
-                          <UsageBar value={t.active_cafes_count} max={t.max_cafes} />
-                        </td>
-                        <td className="w-36 px-3 py-4">
-                          <UsageBar value={t.active_users_count} max={t.max_users} />
+                        <td className="px-3 py-4">
+                          <span className="font-serif text-base italic text-verde-700">{t.active_users_count}</span>
+                          <span className="ml-1.5 text-[11px] text-verde-600">{t.active_users_count === 1 ? 'activo' : 'activos'}</span>
                         </td>
                         <td className="px-3 py-4 text-right font-serif text-base italic text-verde-700">
                           {money(salesByTenant[t.id])}
@@ -208,7 +205,7 @@ export const Plataforma = () => {
                             <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                           </button>
                           {openMenu === t.id && (
-                            <div className="animate-fade-in absolute right-6 top-12 z-20 w-56 rounded-2xl border border-oro-300/70 bg-marfil p-1.5 text-left shadow-lift">
+                            <div className="animate-fade-in absolute right-6 top-12 z-20 w-48 rounded-2xl border border-oro-300/70 bg-marfil p-1.5 text-left shadow-lift">
                               {t.status === 'active' ? (
                                 <button
                                   onClick={() => runAction(() => api.post(`/tenants/${t.id}/deactivate/`), `${t.name} desactivado`)}
@@ -224,40 +221,6 @@ export const Plataforma = () => {
                                   <Power className="h-4 w-4" aria-hidden="true" /> Activar
                                 </button>
                               )}
-                              <div className="mx-3 my-1.5 flex items-center gap-2" aria-hidden="true">
-                                <span className="h-px flex-1 bg-oro-300/70" />
-                                <span className="h-1.5 w-1.5 rotate-45 bg-oro-300" />
-                                <span className="h-px flex-1 bg-oro-300/70" />
-                              </div>
-                              <p className="px-3 pb-1 text-[10px] font-medium uppercase tracking-[0.22em] text-oro-600">
-                                Cambiar plan
-                              </p>
-                              {/* Planes que se venden; el gratis solo se ve (como actual) en cuentas antiguas */}
-                              {(t.plan === 'free' ? ['free', ...PLANES_DE_PAGO] : PLANES_DE_PAGO).map((plan) => (
-                                <button
-                                  key={plan}
-                                  disabled={plan === t.plan}
-                                  onClick={() =>
-                                    runAction(
-                                      () => api.post(`/tenants/${t.id}/upgrade_plan/`, { plan }),
-                                      `Plan ${PLAN_LABELS[plan]} asignado`
-                                    )
-                                  }
-                                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-verde-700 transition-colors hover:bg-pistacho-50 hover:text-cobalto-500 disabled:cursor-default disabled:text-verde-500 disabled:hover:bg-transparent"
-                                >
-                                  <span className="flex items-center gap-2.5">
-                                    <span
-                                      className="h-2 w-2 rotate-45 ring-1 ring-verde-400/40"
-                                      style={{ background: PLAN_COLOR[plan] }}
-                                      aria-hidden="true"
-                                    />
-                                    {PLAN_LABELS[plan]}
-                                  </span>
-                                  {plan === t.plan && (
-                                    <span className="text-[10px] uppercase tracking-[0.18em] text-cobalto-500">actual</span>
-                                  )}
-                                </button>
-                              ))}
                             </div>
                           )}
                         </td>
@@ -272,7 +235,7 @@ export const Plataforma = () => {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
             <Card className="min-w-0 lg:col-span-3">
               <div className="mb-6">
-                <SectionTitle script="Cifras" title="Volumen por distribuidor" subtitle="Pedidos no cancelados, en USD" />
+                <SectionTitle script="Cifras" title="Volumen por distribuidor" subtitle="Pedidos no cancelados, en USD · en claro, los distribuidores no activos" />
               </div>
               {chartData.length === 0 && (
                 <p className="py-6 text-center text-sm text-verde-600">Aparecerá cuando haya distribuidores en la red.</p>
@@ -306,9 +269,9 @@ export const Plataforma = () => {
                       {chartData.map((d) => (
                         <Cell
                           key={d.name}
-                          fill={PLAN_COLOR[d.plan]}
-                          stroke={d.plan === 'free' ? '#7C9E5C' : undefined}
-                          strokeWidth={d.plan === 'free' ? 1 : 0}
+                          fill={d.active ? BAR_COLOR.active : BAR_COLOR.other}
+                          stroke={d.active ? undefined : '#7C9E5C'}
+                          strokeWidth={d.active ? 0 : 1}
                         />
                       ))}
                     </Bar>
@@ -318,36 +281,51 @@ export const Plataforma = () => {
             </Card>
 
             <Card className="lg:col-span-2">
-              <div className="mb-6">
-                <SectionTitle script="La carta" title="Planes" subtitle="Cómo se reparten los distribuidores" />
+              <div className="mb-5">
+                <SectionTitle script="La carta" title="Planes" subtitle="Cafeterías activas por plan" />
               </div>
-              <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-pistacho-100 ring-1 ring-inset ring-oro-200/70">
-                {planCounts.map(({ plan, count }) =>
-                  count ? (
+              <div className="mb-5 flex h-3 overflow-hidden rounded-full bg-pistacho-100 ring-1 ring-inset ring-oro-200/70">
+                {planRows.map((p) =>
+                  p.cafeterias_activas ? (
                     <div
-                      key={plan}
-                      style={{ width: `${(count / tenants.length) * 100}%`, background: PLAN_COLOR[plan] }}
+                      key={p.codigo}
+                      style={{ width: `${(p.cafeterias_activas / activeByPlan) * 100}%`, background: PLAN_COLOR[p.codigo] }}
                       className="border-r-2 border-marfil last:border-r-0"
                     />
                   ) : null
                 )}
               </div>
               <ul className="space-y-3">
-                {planCounts.map(({ plan, count }) => (
-                  <li key={plan} className="flex items-baseline text-sm">
+                {planRows.map((p) => (
+                  <li key={p.codigo} className="flex items-baseline text-sm">
                     <span className="flex items-center gap-2.5 text-[12px] font-medium uppercase tracking-[0.16em] text-verde-600">
                       <span
                         className="h-2.5 w-2.5 rotate-45 ring-1 ring-verde-400/40"
-                        style={{ background: PLAN_COLOR[plan] }}
+                        style={{ background: PLAN_COLOR[p.codigo] }}
                         aria-hidden="true"
                       />
-                      {PLAN_LABELS[plan]}
+                      {p.nombre}
+                      <span className="normal-case tracking-normal text-verde-500">{precio(p.precio_mensual)}</span>
                     </span>
                     <span className="mx-3 flex-1 border-b border-dotted border-oro-300" aria-hidden="true" />
-                    <span className="font-serif text-lg italic text-verde-700">{count}</span>
+                    <span className="font-serif text-lg italic text-verde-700">{p.cafeterias_activas}</span>
                   </li>
                 ))}
               </ul>
+              <div className="mt-5 border-t border-oro-200/80 pt-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-verde-600">Ingreso mensual estimado</p>
+                <p className="mt-1 flex items-baseline gap-2">
+                  <span className="font-serif text-[1.6rem] italic font-medium leading-none text-cobalto-500">
+                    {money(planes?.ingreso_mensual)}
+                  </span>
+                  <span className="text-xs font-medium text-verde-600">/ mes + IVA</span>
+                </p>
+                <p className="mt-1.5 text-[11px] text-verde-600">
+                  {activeByPlan
+                    ? `Con IVA (${planes.iva_porcentaje}%): ${money(planes.ingreso_mensual_con_iva)}. Solo cafeterías abiertas de distribuidores activos.`
+                    : 'Aparecerá cuando haya cafeterías abiertas.'}
+                </p>
+              </div>
             </Card>
           </div>
         </>

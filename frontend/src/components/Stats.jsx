@@ -51,23 +51,6 @@ export const StatTile = ({ icon: Icon, label, value, hint, featured = false, del
   </div>
 );
 
-// Barra de uso "x de max": verde con holgura, oro cerca del límite y terracota al tope
-export const UsageBar = ({ value, max, className = '' }) => {
-  const unlimited = max >= 999;
-  const pct = unlimited ? Math.min(100, value * 2) : Math.min(100, (value / Math.max(max, 1)) * 100);
-  const tone = !unlimited && pct >= 90 ? 'bg-terracotta-600' : !unlimited && pct >= 70 ? 'bg-oro-400' : 'bg-verde-500';
-  return (
-    <div className={className}>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-pistacho-100 ring-1 ring-inset ring-oro-200/60">
-        <div className={`h-full rounded-full ${tone} transition-all duration-700`} style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mt-1 text-[11px] text-verde-600">
-        {value} {unlimited ? '· ilimitado' : `de ${max}`}
-      </p>
-    </div>
-  );
-};
-
 // Avatar con aro de oro e iniciales en Playfair cursiva; `dark` (admins) lo pinta en cobalto
 export const Avatar = ({ name = '?', dark = false, size = 'md' }) => {
   const initials = name

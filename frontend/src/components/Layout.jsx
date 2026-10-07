@@ -192,7 +192,7 @@ export const EmptyState = ({ icon: Icon = Coffee, title, description }) => (
   </Card>
 );
 
-// Selector segmentado para filtros
+// Selector segmentado para filtros (en el celular, menos relleno para que tres opciones quepan en una fila)
 export const Segmented = ({ options, value, onChange }) => (
   <div className="inline-flex flex-wrap rounded-full border border-oro-300/70 bg-marfil p-1" role="tablist">
     {options.map((o) => (
@@ -201,7 +201,7 @@ export const Segmented = ({ options, value, onChange }) => (
         role="tab"
         aria-selected={value === o.value}
         onClick={() => onChange(o.value)}
-        className={`rounded-full px-4 py-1.5 text-[12px] font-medium uppercase tracking-[0.14em] transition-all ${
+        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium uppercase tracking-[0.14em] transition-all sm:px-4 ${
           value === o.value ? 'bg-verde-700 text-marfil' : 'text-verde-600 hover:text-cobalto-500'
         }`}
       >

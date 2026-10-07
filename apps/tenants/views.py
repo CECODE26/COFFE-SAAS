@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .models import LIMITES_POR_PLAN, PLANES_DE_PAGO, Tenant
+from .models import Tenant
 from .serializers import (
     TenantListSerializer, TenantDetailSerializer,
     TenantCreateSerializer, TenantUpdateSerializer, TenantStatsSerializer
@@ -17,7 +17,7 @@ class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
     permission_classes = [IsAuthenticated]
     search_fields = ['name', 'email', 'ruc', 'business_name']
-    ordering_fields = ['created_at', 'name', 'plan', 'status']
+    ordering_fields = ['created_at', 'name', 'status']
     ordering = ['-created_at']
 
     def get_serializer_class(self):
@@ -31,7 +31,7 @@ class TenantViewSet(viewsets.ModelViewSet):
 
     # Acciones que solo hace el super admin. Este método reemplaza los permission_classes
     # de cada @action, así que la lista tiene que incluirlas a todas.
-    SOLO_SUPER_ADMIN = ['create', 'update', 'partial_update', 'destroy', 'activate', 'deactivate', 'upgrade_plan']
+    SOLO_SUPER_ADMIN = ['create', 'update', 'partial_update', 'destroy', 'activate', 'deactivate']
 
     def get_permissions(self):
         if self.action in self.SOLO_SUPER_ADMIN:
@@ -74,10 +74,6 @@ class TenantViewSet(viewsets.ModelViewSet):
             'active_cafes': tenant.get_active_cafes_count(),
             'total_users': tenant.users.count(),
             'active_users': tenant.get_active_users_count(),
-            'plan': tenant.plan,
-            'subscription_expires_at': tenant.subscription_expires_at,
-            'can_create_cafe': tenant.can_create_cafe(),
-            'can_create_user': tenant.can_create_user(),
         }
 
         serializer = TenantStatsSerializer(stats_data)
@@ -123,55 +119,5 @@ class TenantViewSet(viewsets.ModelViewSet):
         tenant.save()
         return Response(
             {'status': 'success', 'message': 'Tenant desactivado'},
-            status=status.HTTP_200_OK
-        )
-
-    @action(
-        detail=True, methods=['post'],
-        permission_classes=[IsAuthenticated, IsSuperAdmin]
-    )
-    def upgrade_plan(self, request, pk=None):
-        """Mejorar plan del tenant"""
-        tenant = self.get_object()
-        plan = request.data.get('plan')
-
-        if plan == 'free':
-            return Response(
-                {'error': 'No hay plan gratis: elige Básico, Pro o Empresa.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if not isinstance(plan, str) or plan not in PLANES_DE_PAGO:
-            return Response(
-                {'error': 'Plan inválido: elige Básico, Pro o Empresa.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Asignar límites según plan (los mismos que al crear el distribuidor)
-        limites = LIMITES_POR_PLAN[plan]
-        tenant.plan = plan
-        tenant.max_cafes = limites['max_cafes']
-        tenant.max_users = limites['max_users']
-        tenant.save()
-
-        # Bajar a un plan con menos cupo del que ya usa se permite, pero se avisa
-        nombre_plan = tenant.get_plan_display()
-        excesos = []
-        cafes, usuarios = tenant.get_active_cafes_count(), tenant.users.count()
-        if cafes > tenant.max_cafes:
-            excesos.append(f'{cafes} cafeterías activas (el {nombre_plan} permite {tenant.max_cafes})')
-        if usuarios > tenant.max_users:
-            excesos.append(f'{usuarios} usuarios (el {nombre_plan} permite {tenant.max_users})')
-        aviso = (
-            f'{tenant.name} tiene {" y ".join(excesos)}: no podrá crear más hasta bajar de ese número.'
-            if excesos else None
-        )
-
-        return Response(
-            {
-                'status': 'success',
-                'message': f'Plan actualizado a {plan}',
-                'aviso': aviso,
-                'data': TenantDetailSerializer(tenant).data
-            },
             status=status.HTTP_200_OK
         )

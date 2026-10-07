@@ -11,7 +11,7 @@ COFFE-SAAS es una plataforma SaaS multi-tenant diseñada para gestionar redes de
   - Distribuidor de cafeterías en una región
   - Puede crear múltiples cafeterías
   - Puede invitar usuarios a sus cafeterías
-  - Acceso a plan de suscripción
+  - No tiene plan, límites ni vencimiento de suscripción: el plan lo paga cada cafetería
 
 - **Attributes:**
   - `id` (UUID) - Primary key
@@ -19,11 +19,7 @@ COFFE-SAAS es una plataforma SaaS multi-tenant diseñada para gestionar redes de
   - `slug` - URL-friendly identifier
   - `email`, `phone`, `address` - Contact info
   - `ruc` - Unique business identifier (Ecuador)
-  - `plan` - free, basic, pro, enterprise
-  - `max_cafes` - Limit based on plan
-  - `max_users` - Limit based on plan
   - `status` - active, inactive, suspended
-  - `subscription_expires_at` - Plan expiration date
 
 ### User (Multi-tenant)
 - **Responsabilidades:**
@@ -36,7 +32,7 @@ COFFE-SAAS es una plataforma SaaS multi-tenant diseñada para gestionar redes de
   super_admin (1)
     ├── Solo el owner de la plataforma
     ├── Acceso a todos los tenants
-    └── Gestión de planes y facturación
+    └── Gestión de planes de las cafeterías y facturación
   
   distribuidor_admin (N)
     ├── Admin de un tenant específico
@@ -74,8 +70,11 @@ COFFE-SAAS es una plataforma SaaS multi-tenant diseñada para gestionar redes de
   - `name` - Nombre del local
   - `slug` - URL identifier
   - `address`, `city`, `postal_code`
-  - `max_tables`, `capacity`
+  - `capacity`
   - `open_time`, `close_time`
+  - `plan` - mensual ($70) o pro ($90, Mensual Pro), por local al mes, más IVA 15%.
+    Catálogo en `apps/cafeterias/planes.py` (espejo de `frontend/src/config/site.js`).
+    Lo eligen y cambian el super admin y el distribuidor dueño; el resto solo lo ve.
 
 ## Multi-Tenant Implementation
 
@@ -232,14 +231,10 @@ CREATE TABLE tenants (
   name VARCHAR(255) UNIQUE NOT NULL,
   slug VARCHAR(255) UNIQUE NOT NULL,
   email VARCHAR(255) NOT NULL,
-  plan VARCHAR(20) DEFAULT 'free',
-  max_cafes INT DEFAULT 1,
-  max_users INT DEFAULT 10,
   status VARCHAR(20) DEFAULT 'active',
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP,
-  updated_at TIMESTAMP,
-  subscription_expires_at TIMESTAMP
+  updated_at TIMESTAMP
 );
 
 -- Cafeterias (Locales)
@@ -253,6 +248,7 @@ CREATE TABLE cafeterias (
   capacity INT DEFAULT 50,
   open_time TIME,
   close_time TIME,
+  plan VARCHAR(20) DEFAULT 'mensual',  -- mensual | pro
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP,
   updated_at TIMESTAMP,

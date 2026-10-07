@@ -47,7 +47,7 @@ class RegistroDistribuidorTests(PruebaUsuarios):
         self.assertNotIn('refresh', r.data['data'])
 
         tenant = Tenant.objects.get(name='Cafés del Austro')
-        self.assertEqual((tenant.plan, tenant.max_cafes, tenant.max_users), ('basic', 5, 50))
+        self.assertNotIn('plan', r.data['data']['tenant'])
         self.assertEqual(tenant.slug, 'cafes-del-austro')
         self.assertEqual(tenant.email, 'admin@cafesdelaustro.ec')
 
@@ -58,7 +58,6 @@ class RegistroDistribuidorTests(PruebaUsuarios):
 
     def test_mismas_reglas_que_la_consola(self):
         casos = [
-            ({'plan': 'free'}, 'plan', 'gratis'),
             ({'ruc': '0000000000000'}, 'ruc', 'provincia'),
             ({'ruc': '01901234560'}, 'ruc', '13 dígitos'),
             ({'distribuidor_name': self.tenant.name.upper()}, 'distribuidor_name', 'Ya existe'),
@@ -70,6 +69,12 @@ class RegistroDistribuidorTests(PruebaUsuarios):
                 self.assertEqual(r.status_code, 400, r.content)
                 self.assertIn(texto, str(r.data[campo]))
         self.assertFalse(User.objects.filter(email='admin@cafesdelaustro.ec').exists())
+
+    def test_plan_enviado_se_ignora(self):
+        # El distribuidor ya no tiene plan: si un cliente antiguo lo manda, no molesta ni se guarda
+        r = self.registrar(self.super_admin, plan='free')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(Tenant.objects.filter(name='Cafés del Austro').exists())
 
     def test_slug_libre_con_sufijo(self):
         # Otro nombre que da el mismo slug que una cadena existente: antes terminaba en 500

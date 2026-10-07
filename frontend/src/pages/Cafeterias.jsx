@@ -5,7 +5,8 @@ import { Card } from '../components/Card';
 import { Badge } from '../components/StatusBadge';
 import { Button } from '../components/Button';
 import { CafeteriaForm } from '../components/CafeteriaForm';
-import { Store, MapPin, Clock, Phone, Armchair, Users, Network, Plus } from 'lucide-react';
+import { PLAN_TONE, precioMensual } from '../lib/planes';
+import { Store, MapPin, Clock, Phone, Armchair, Users, Network, Plus, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { fetchAll } from '../services/api';
 
@@ -16,6 +17,8 @@ export const Cafeterias = () => {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  // Cafetería en edición (datos y plan); null = cerrado
+  const [editing, setEditing] = useState(null);
 
   const load = () => fetchAll('/cafeterias/').then(setCafes);
 
@@ -90,6 +93,13 @@ export const Cafeterias = () => {
                       <span className="h-px w-10 bg-oro-300" />
                       <span className="h-1.5 w-1.5 rotate-45 bg-oro-300" />
                     </div>
+                    {c.plan_info && (
+                      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="sr-only">Plan:</span>
+                        <Badge tone={PLAN_TONE[c.plan]} dot={false}>{c.plan_info.nombre}</Badge>
+                        <span className="text-xs text-verde-600">{precioMensual(c.plan_info.precio_mensual)}</span>
+                      </p>
+                    )}
                     <div className="mt-3 space-y-1.5 text-sm text-verde-600">
                       <p className="flex items-start gap-2">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-oro-600" aria-hidden="true" />
@@ -118,11 +128,16 @@ export const Cafeterias = () => {
                         <span className="sr-only">Equipo:</span> {c.active_users_count}
                       </span>
                     </div>
-                    {user?.role === 'distribuidor_admin' && (
-                      <Button size="sm" variant={c.is_active ? 'ghost' : 'secondary'} onClick={() => toggle(c)}>
-                        {c.is_active ? 'Cerrar' : 'Abrir'}
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(c)} aria-label={`Editar ${c.name} y su plan`}>
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar
                       </Button>
-                    )}
+                      {user?.role === 'distribuidor_admin' && (
+                        <Button size="sm" variant={c.is_active ? 'ghost' : 'secondary'} onClick={() => toggle(c)}>
+                          {c.is_active ? 'Cerrar' : 'Abrir'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -130,7 +145,13 @@ export const Cafeterias = () => {
           )}
         </>
       )}
-      <CafeteriaForm open={creating} onClose={() => setCreating(false)} onCreated={() => load()} />
+      <CafeteriaForm open={creating} onClose={() => setCreating(false)} onSaved={() => load().catch(() => {})} />
+      <CafeteriaForm
+        open={!!editing}
+        cafe={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => load().catch(() => {})}
+      />
     </Layout>
   );
 };

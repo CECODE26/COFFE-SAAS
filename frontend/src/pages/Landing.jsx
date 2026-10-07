@@ -507,7 +507,7 @@ export const Landing = () => (
                 {hl && (
                   <span className="absolute -top-3.5 right-8 inline-flex items-center gap-2 rounded-full bg-cobalto-500 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-marfil shadow-[inset_0_0_0_2px_#22409A,inset_0_0_0_3px_#D8B45C]">
                     <span className="h-1.5 w-1.5 rotate-45 bg-oro-300" aria-hidden="true" />
-                    Con facturación
+                    Más completo
                   </span>
                 )}
                 <p className="font-serif text-3xl font-medium italic">{plan.name}</p>

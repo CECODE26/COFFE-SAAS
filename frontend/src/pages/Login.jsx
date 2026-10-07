@@ -3,18 +3,15 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { CintaCarta, CintaFirma, LogoSello, SelloGiratorio, TazaPorcelana, Toldo, Vitrina } from '../components/Decor';
 import toast from 'react-hot-toast';
-import { ArrowRight, Globe2, Network, Store } from 'lucide-react';
+import { ArrowRight, Store } from 'lucide-react';
 import { homeFor } from '../lib/roles';
 
-// Cuentas demo: solo en desarrollo (o en una demo pública con REACT_APP_CUENTAS_DEMO=true).
-// En el build de producción la condición es constante y el bloque (con sus contraseñas) no se incluye.
+// Cuenta demo: solo en desarrollo (o en una demo pública con REACT_APP_CUENTAS_DEMO=true).
+// En el build de producción la condición es constante y el bloque (con su contraseña) no se incluye.
+// Decisión del dueño: la demo es solo de Cafetería; nunca Super Admin ni Distribuidor.
 const MOSTRAR_DEMO = process.env.NODE_ENV === 'development' || process.env.REACT_APP_CUENTAS_DEMO === 'true';
 const DEMO_ACCOUNTS = MOSTRAR_DEMO
-  ? [
-      { email: 'superadmin@coffe.com', password: 'admin123', label: 'Super Admin', hint: 'Toda la plataforma', icon: Globe2 },
-      { email: 'distribuidor@coffe.com', password: 'admin123', label: 'Distribuidor', hint: 'Andes Coffee Group', icon: Network },
-      { email: 'admin@coffe.com', password: 'admin', label: 'Cafetería', hint: 'Café La Floresta', icon: Store },
-    ]
+  ? [{ email: 'admin@coffe.com', password: 'admin', label: 'Cafetería', hint: 'Café La Floresta', icon: Store }]
   : [];
 
 const CINTA = ['Mesas con QR', 'Pedidos en tiempo real', 'Carta digital', 'Reservas', 'Tu equipo'];
@@ -181,10 +178,10 @@ export const Login = () => {
             {DEMO_ACCOUNTS.length > 0 && (
             <div className="mt-9">
               <p className="mb-3 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.2em] text-verde-600">
-                Cuentas demo
+                Cuenta demo
                 <span className="h-px flex-1 bg-oro-300/70" aria-hidden="true" />
               </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2">
                 {DEMO_ACCOUNTS.map((account) => {
                   const Icon = account.icon;
                   const active = email === account.email;
@@ -194,14 +191,14 @@ export const Login = () => {
                       type="button"
                       onClick={() => fillDemo(account)}
                       aria-pressed={active}
-                      className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all duration-200 sm:flex-col sm:items-start sm:gap-0 ${
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all duration-200 ${
                         active
                           ? 'border-cobalto-500 bg-cobalto-50 ring-2 ring-cobalto-100'
                           : 'border-oro-300/70 bg-crema/70 hover:-translate-y-0.5 hover:border-cobalto-400'
                       }`}
                     >
                       <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-oro-400 sm:mb-2 ${
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-oro-400 ${
                           active ? 'bg-cobalto-500 text-marfil' : 'bg-pistacho-100 text-verde-700'
                         }`}
                         aria-hidden="true"

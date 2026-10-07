@@ -3,6 +3,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.tenants.models import Tenant
 
+from .planes import PLAN_CHOICES, PLAN_POR_DEFECTO
+
 
 class Cafeteria(models.Model):
     """Cafetería/Local del Distribuidor"""
@@ -40,6 +42,9 @@ class Cafeteria(models.Model):
     # Media
     logo = models.ImageField(_('Logo'), upload_to='cafeterias/logos/', null=True, blank=True)
     banner = models.ImageField(_('Banner'), upload_to='cafeterias/banners/', null=True, blank=True)
+
+    # Plan que paga el local (catálogo y precios en planes.py). Solo lo cambian el super admin y su distribuidor.
+    plan = models.CharField(_('Plan'), max_length=20, choices=PLAN_CHOICES, default=PLAN_POR_DEFECTO)
 
     # Status
     is_active = models.BooleanField(_('Activo'), default=True)

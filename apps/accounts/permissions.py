@@ -103,8 +103,11 @@ class IsCafeUser(permissions.BasePermission):
 
 
 class CanCreateCafeteria(permissions.BasePermission):
-    """Verificar si puede crear más cafeterías"""
-    message = "Has alcanzado el límite de cafeterías para tu plan."
+    """
+    Crea cafeterías el super admin (eligiendo el distribuidor) o el distribuidor en su propia red.
+    Sin límite de locales: cada cafetería paga su propio plan (apps/cafeterias/planes.py).
+    """
+    message = "No tienes permisos para crear cafeterías."
 
     def has_permission(self, request, view):
         if request.user.role == 'super_admin':
@@ -113,8 +116,10 @@ class CanCreateCafeteria(permissions.BasePermission):
         if request.user.role != 'distribuidor_admin':
             return False
 
-        tenant = request.user.tenant
-        return tenant and tenant.can_create_cafe()
+        if not request.user.tenant_id:
+            self.message = "Tu cuenta no tiene un distribuidor asignado."
+            return False
+        return True
 
 
 # Quién crea a quién: super_admin crea distribuidores (tenants) y usuarios de cualquier rol,
@@ -126,7 +131,7 @@ PERSONAL_DE_CAFETERIA = ('gerente', 'camarero', 'cajero', 'cocinero')
 
 
 class CanCreateUser(permissions.BasePermission):
-    """Puede crear usuarios: rol creador, con tenant (y local, si es cafe_admin) y cupo en el plan"""
+    """Puede crear usuarios: rol creador, con tenant (y local, si es cafe_admin). Sin límite de usuarios."""
     message = "No tienes permisos para crear usuarios."
 
     def has_permission(self, request, view):
@@ -138,10 +143,6 @@ class CanCreateUser(permissions.BasePermission):
             return False
         if user.role == 'cafe_admin' and not user.cafeteria_id:
             self.message = "Tu cuenta no tiene una cafetería asignada."
-            return False
-
-        if not user.tenant.can_create_user():
-            self.message = "Has alcanzado el límite de usuarios para tu plan."
             return False
         return True
 

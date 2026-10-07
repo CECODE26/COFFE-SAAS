@@ -26,6 +26,9 @@ export const SITE = {
   taxNote: 'Precios en dólares, más IVA (15%).',
 };
 
+// Planes de cada cafetería (el plan lo paga cada local, no el distribuidor). Precios sin IVA.
+// ESPEJO: apps/cafeterias/planes.py (PLANES: código, nombre y precio). Si cambias un id, un nombre o un precio
+// aquí, cámbialo también allá (y al revés); la prueba CatalogoSincronizadoTests avisa si se desincronizan.
 export const PLANS = [
   {
     id: 'mensual',
@@ -47,19 +50,19 @@ export const PLANS = [
   {
     id: 'pro',
     name: 'Mensual Pro',
-    price: 90, // [precio del plan Pro por confirmar]
+    price: 90,
     period: 'mes por local',
-    description: 'Todo el plan Mensual, más facturación electrónica.',
+    description: 'Todo el plan Mensual, más soporte prioritario y facturación electrónica (próximamente).',
     highlight: true,
+    // Nada se bloquea por plan: varios locales en un panel es del distribuidor, sea cual sea el plan de cada uno
     features: [
       'Todo lo del plan Mensual',
       'Facturación electrónica SRI',
-      'Varios locales en un solo panel',
       'Soporte prioritario',
       'Capacitación inicial para tu equipo',
     ],
     soon: ['Facturación electrónica SRI'],
-    cta: 'Contratar Pro',
+    cta: 'Contratar Pro', // corto a propósito: 'Contratar Mensual Pro' parte el botón en dos líneas en el celular
   },
 ];
 

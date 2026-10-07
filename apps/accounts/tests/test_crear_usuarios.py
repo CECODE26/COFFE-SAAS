@@ -8,6 +8,17 @@ PERSONAL = ['gerente', 'camarero', 'cajero', 'cocinero']
 TODOS_LOS_ROLES = [r for r, _ in User.ROLE_CHOICES]
 
 
+def crear_en_lote(tenant, cafeteria, cuantos):
+    """Muchas cuentas de una vez (sin calcular contraseñas, que es lo lento)"""
+    User.objects.bulk_create([
+        User(
+            email=f'lote{n}-{tenant.slug}@prueba.ec', first_name='Lote', last_name=str(n),
+            role='camarero', tenant=tenant, cafeteria=cafeteria, password='!',
+        )
+        for n in range(cuantos)
+    ])
+
+
 class RolesAsignablesTests(PruebaUsuarios):
 
     def test_tabla_de_roles_por_creador(self):
@@ -91,12 +102,11 @@ class DistribuidorCreaTests(PruebaUsuarios):
         self.assertEqual(r.status_code, 400)
         self.assertIn('cafeteria', r.data)
 
-    def test_limite_de_usuarios_del_plan(self):
-        self.tenant.max_users = User.objects.filter(tenant=self.tenant).count()
-        self.tenant.save()
+    def test_sin_limite_de_usuarios(self):
+        # El distribuidor ya no tiene plan ni tope de usuarios (antes, el plan Básico cortaba en 50)
+        crear_en_lote(self.tenant, self.cafe, 60)
         r = self.crear_usuario_api(self.distribuidor, 'cafe_admin', cafeteria=str(self.cafe.pk))
-        self.assertEqual(r.status_code, 403)
-        self.assertIn('límite', str(r.data['detail']))
+        self.assertEqual(r.status_code, 201, r.content)
 
 
 class AdminCafeteriaCreaTests(PruebaUsuarios):
@@ -142,12 +152,10 @@ class AdminCafeteriaCreaTests(PruebaUsuarios):
         r = self.crear_usuario_api(sin_local, 'camarero')
         self.assertEqual(r.status_code, 403)
 
-    def test_limite_de_usuarios_del_plan(self):
-        self.tenant.max_users = User.objects.filter(tenant=self.tenant).count()
-        self.tenant.save()
+    def test_sin_limite_de_usuarios(self):
+        crear_en_lote(self.tenant, self.cafe, 60)
         r = self.crear_usuario_api(self.cafe_admin, 'camarero')
-        self.assertEqual(r.status_code, 403)
-        self.assertIn('límite', str(r.data['detail']))
+        self.assertEqual(r.status_code, 201, r.content)
 
 
 class OtrosRolesNoCreanTests(PruebaUsuarios):

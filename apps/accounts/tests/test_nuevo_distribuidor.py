@@ -52,14 +52,13 @@ class NuevoDistribuidorTests(PruebaUsuarios):
         self.assertFalse(cuenta.is_staff)
         self.assertFalse(cuenta.is_superuser)
 
-        # Contacto de la empresa = el de la cuenta; plan y límites, los del modelo
+        # Contacto de la empresa = el de la cuenta (el distribuidor no tiene plan: es de cada cafetería)
         self.assertEqual(tenant.email, cuenta.email)
         self.assertTrue(tenant.email.islower())
         self.assertEqual(tenant.phone, '072345678')
         self.assertEqual((tenant.business_name, tenant.ruc), ('Cafés del Austro Cía. Ltda.', '0190123456001'))
         self.assertEqual(tenant.slug, 'cafes-del-austro')
-        plan = Tenant._meta.get_field('plan').get_default()
-        self.assertEqual(tenant.plan, plan)
+        self.assertFalse(hasattr(tenant, 'plan'))
 
     def test_email_y_telefono_propios_de_la_empresa(self):
         r = self.crear(empresa=self.empresa(email='Contacto@Austro.EC', phone='072000000'))

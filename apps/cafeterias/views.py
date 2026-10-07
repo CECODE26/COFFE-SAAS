@@ -1,15 +1,28 @@
+from collections.abc import Mapping
+from decimal import Decimal
+
+from django.db import transaction
+from django.db.models import Count
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Cafeteria
+from .planes import IVA_PORCENTAJE, NOTA_IVA, PLANES, con_iva, info_plan
 from .serializers import (
     CafeteriaListSerializer, CafeteriaDetailSerializer,
-    CafeteriaCreateSerializer, CafeteriaUpdateSerializer, CafeteriaStatsSerializer
+    CafeteriaCreateSerializer, CafeteriaUpdateSerializer, CafeteriaStatsSerializer,
+    puede_cambiar_plan,
 )
 from apps.accounts.permissions import (
     IsDistribuidorAdmin, IsCafeAdmin, CanCreateCafeteria, IsTenantMember
+)
+from apps.auditoria.services import registrar
+
+PLAN_SOLO_LECTURA = (
+    'Solo el super administrador o el distribuidor de esta cafetería pueden cambiar su plan.'
 )
 
 
@@ -35,6 +48,8 @@ class CafeteriaViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsDistribuidorAdmin(), CanCreateCafeteria()]
         elif self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsCafeAdmin()]
+        elif self.action == 'resumen_planes':
+            return [IsAuthenticated(), IsDistribuidorAdmin()]
         else:
             return [IsAuthenticated(), IsTenantMember()]
 
@@ -53,6 +68,63 @@ class CafeteriaViewSet(viewsets.ModelViewSet):
             return Cafeteria.objects.filter(id=user.cafeteria_id)
 
         return Cafeteria.objects.none()
+
+    def update(self, request, *args, **kwargs):
+        # El plan lo ven todos, pero solo lo cambian el super admin y el distribuidor dueño. Al admin de la
+        # cafetería se le responde 403 si pide OTRO plan; el mismo que ya tiene no cambia nada y se acepta.
+        if not puede_cambiar_plan(request.user) and isinstance(request.data, Mapping) and 'plan' in request.data:
+            if request.data.get('plan') != self.get_object().plan:
+                raise PermissionDenied(PLAN_SOLO_LECTURA)
+        return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            # Plan anterior leído con la fila bloqueada: dos cambios a la vez quedan auditados en orden
+            antes = (
+                Cafeteria.objects.select_for_update()
+                .values_list('plan', flat=True)
+                .get(pk=serializer.instance.pk)
+            )
+            cafeteria = serializer.save()
+            if cafeteria.plan != antes:
+                registrar(
+                    self.request.user, 'cafeteria.cambiar_plan', cafeteria,
+                    nombre=cafeteria.name, antes=antes, despues=cafeteria.plan,
+                    antes_nombre=info_plan(antes)['nombre'], despues_nombre=info_plan(cafeteria.plan)['nombre'],
+                )
+
+    @action(detail=False, methods=['get'])
+    def resumen_planes(self, request):
+        """
+        Cafeterías activas por plan e ingreso mensual estimado (suma de los precios, SIN IVA), para la consola
+        del super admin (toda la plataforma) y el panel del distribuidor (su red). Activa = local abierto de un
+        distribuidor activo: un distribuidor inactivo o suspendido no opera (su personal no entra) y no factura.
+        Una sola consulta agrupada, sin importar cuántas cafeterías haya.
+        """
+        conteo = dict(
+            self.get_queryset()
+            .filter(is_active=True, tenant__is_active=True)
+            .order_by()
+            .values_list('plan')
+            .annotate(n=Count('id'))
+        )
+        planes = []
+        for codigo, datos in PLANES.items():
+            cafeterias = conteo.get(codigo, 0)
+            planes.append({
+                **info_plan(codigo),
+                'cafeterias_activas': cafeterias,
+                'ingreso_mensual': str(datos['precio_mensual'] * cafeterias),
+            })
+        ingreso = sum((Decimal(p['ingreso_mensual']) for p in planes), Decimal('0.00'))
+        return Response({
+            'planes': planes,
+            'cafeterias_activas': sum(p['cafeterias_activas'] for p in planes),
+            'ingreso_mensual': str(ingreso),
+            'ingreso_mensual_con_iva': str(con_iva(ingreso)),
+            'iva_porcentaje': IVA_PORCENTAJE,
+            'nota': NOTA_IVA,
+        })
 
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):

@@ -76,9 +76,6 @@ tenant = Tenant.objects.create(
     email="admin@distribuidora.com",
     ruc="1234567890",
     business_name="Distribuidora Central S.A.",
-    plan="pro",
-    max_cafes=10,
-    max_users=100,
 )
 
 # Crear Usuario Admin
@@ -159,7 +156,6 @@ curl -X POST http://localhost:8000/api/v1/tenants/ \
     "name": "Distribuidora Quito",
     "email": "info@quito.com",
     "ruc": "1791234567001",
-    "plan": "basic",
     "business_name": "Distribuidora Quito S.A.",
     "phone": "+593987654321"
   }'
@@ -167,7 +163,7 @@ curl -X POST http://localhost:8000/api/v1/tenants/ \
 
 ### Registro de Distribuidor
 
-**Distribuidor y su administrador en un paso** (solo super admin; no hay registro público ni plan gratis)
+**Distribuidor y su administrador en un paso** (solo super admin; no hay registro público). El distribuidor no tiene plan: el plan es de cada cafetería.
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/register/ \
   -H "Authorization: Bearer <access_token_super_admin>" \
@@ -177,7 +173,6 @@ curl -X POST http://localhost:8000/api/v1/auth/register/ \
     "password": "SecurePass123",
     "password2": "SecurePass123",
     "distribuidor_name": "Mi Distribuidora",
-    "plan": "basic",
     "ruc": "1792345678001",
     "business_name": "Mi Distribuidora S.A.",
     "first_name": "Carlos",
@@ -218,7 +213,7 @@ curl -X GET http://localhost:8000/api/v1/cafeterias/ \
   -H "Authorization: Bearer <access_token>"
 ```
 
-**Crear** (Distribuidor Admin)
+**Crear** (Distribuidor Admin o Super Admin). `plan`: `mensual` ($70) o `pro` ($90, Mensual Pro), por local al mes, más IVA 15%; sin enviarlo queda en `mensual`.
 ```bash
 curl -X POST http://localhost:8000/api/v1/cafeterias/ \
   -H "Authorization: Bearer <distribuidor_token>" \
@@ -229,11 +224,24 @@ curl -X POST http://localhost:8000/api/v1/cafeterias/ \
     "city": "Quito",
     "phone": "+593987654324",
     "email": "cafe.centro@distribuidor.com",
-    "max_tables": 15,
     "capacity": 50,
     "open_time": "07:00:00",
-    "close_time": "22:00:00"
+    "close_time": "22:00:00",
+    "plan": "pro"
   }'
+```
+
+**Cambiar el plan** (solo Super Admin o el distribuidor dueño; el admin de la cafetería recibe 403). Queda en la auditoría como `cafeteria.cambiar_plan`.
+```bash
+curl -X PATCH http://localhost:8000/api/v1/cafeterias/<id>/ \
+  -H "Authorization: Bearer <distribuidor_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"plan": "mensual"}'
+```
+
+**Resumen por plan** (Super Admin: toda la plataforma; distribuidor: su red). Cafeterías activas por plan e ingreso mensual estimado sin IVA.
+```bash
+curl http://localhost:8000/api/v1/cafeterias/resumen_planes/ -H "Authorization: Bearer <access_token>"
 ```
 
 ---

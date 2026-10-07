@@ -230,8 +230,8 @@ La **F1 ya da valor por sí sola**: la cafetería tiene clientes frecuentes y m�
 
 ## 13. Cómo venderlo
 
-- **Plan Mensual ($70):** incluye la **tarjeta de sellos en el celular (F1)**. Es un gancho fuerte y no te genera costos variables.
-- **Plan Mensual Pro ($90):** suma **WhatsApp, reenganche y campañas (F2 y F3)**, y más adelante la tarjeta en Wallet. El costo de los mensajes lo paga cada cafetería directo a Meta, y el panel se lo muestra siempre antes de enviar.
+- **Plan Mensual ($70 + IVA):** incluye la **tarjeta de sellos en el celular (F1)**. Es un gancho fuerte y no te genera costos variables.
+- **Plan Mensual Pro ($90 + IVA):** suma **WhatsApp, reenganche y campañas (F2 y F3)**, y más adelante la tarjeta en Wallet. El costo de los mensajes lo paga cada cafetería directo a Meta, y el panel se lo muestra siempre antes de enviar.
 - Mensaje comercial: *"Tus clientes vuelven más: tarjeta de sellos digital sin imprimir cartoncitos, avisos por WhatsApp y campañas a quienes dejaron de venir, midiendo cuánto te trae cada una."*
 
 ## 14. Decisiones para ti

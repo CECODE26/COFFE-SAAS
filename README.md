@@ -9,7 +9,7 @@ Plataforma SaaS multi-tenant para administración de cafeterías y distribuidore
 │          SUPER ADMIN (You)                           │
 │  - Gestiona Distribuidores                          │
 │  - Ve métricas globales                             │
-│  - Control de suscripciones                         │
+│  - Planes de cada cafetería (Mensual / Pro)         │
 └──────────────────────┬──────────────────────────────┘
                        │
         ┌──────────────┴──────────────┐
@@ -30,17 +30,16 @@ CAFE-1    CAFE-1     CAFE-2   CAFE-3    CAFE-3
 ### 1. SUPER ADMIN (Administrador Global)
 - Panel para crear/gestionar Distribuidores
 - Estadísticas de toda la red
-- Planes y facturación
-- Control de suscripciones
+- Plan de cada cafetería (Mensual $70 o Mensual Pro $90 por local al mes, más IVA) e ingreso mensual estimado
 
 ### 2. DISTRIBUIDOR (Gestor de Zona)
-- Crea sus propias cafeterías/locales
+- Crea sus propias cafeterías/locales y elige o cambia el plan de cada una (el distribuidor no tiene plan)
 - Agrega usuarios (camareros, cajeros, gerentes) a sus cafés
 - Panel con sus cafeterías y métricas
 - Gestión de empleados por cafetería
 
 ### 3. USUARIOS DE CAFETERÍA (Camareros, Cajeros, Gerentes)
-- Acceso solo a su cafetería asignada
+- Acceso solo a su cafetería asignada (ven su plan, no lo cambian)
 - Funcionalidades: órdenes, mesas, pagos
 - Roles específicos (camarero, cajero, cocinero, etc.)
 
@@ -55,8 +54,6 @@ Tenant (Distribuidor)
 ├── slug
 ├── email, phone, address
 ├── ruc, business_name
-├── plan (free, basic, pro, enterprise)
-├── max_cafes, max_users
 ├── status (active, inactive, suspended)
 └── created_at, updated_at
 
@@ -74,8 +71,9 @@ Cafeteria (Local)
 ├── tenant_id (FK) ← Pertenece a Distribuidor
 ├── name, slug
 ├── address, city, phone, email
-├── max_tables, capacity
+├── capacity
 ├── open_time, close_time
+├── plan (mensual, pro) ← lo paga cada local; catálogo en apps/cafeterias/planes.py
 └── created_at, updated_at
 ```
 
@@ -173,7 +171,8 @@ El middleware `TenantMiddleware` resuelve automáticamente el tenant desde:
 ## Próximas Fases
 
 ### Fase 2: Features SaaS
-- [ ] Sistema de planes y facturación (Stripe)
+- [x] Planes por cafetería (Mensual y Mensual Pro; se contratan por WhatsApp)
+- [ ] Facturación electrónica SRI (incluida en Mensual Pro, próximamente)
 - [ ] Landing page
 - [ ] Dashboard de super admin
 - [ ] Dashboard de distribuidor

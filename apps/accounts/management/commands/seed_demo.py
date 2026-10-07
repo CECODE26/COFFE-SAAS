@@ -45,12 +45,13 @@ from django.utils.text import slugify
 from apps.accounts.models import User
 from apps.auditoria.models import RegistroAuditoria, SolicitudDatos
 from apps.cafeterias.models import Cafeteria
+from apps.cafeterias.planes import PLAN_POR_DEFECTO
 from apps.comensales.models import AlertaMesero, SesionCliente, SolicitudPago, SolicitudUnion
 from apps.menu.imagenes import ImagenInvalida, aplicar_imagen, procesar_imagen
 from apps.menu.models import Category, MenuItem
 from apps.mesas.models import Mesa, Reserva, generar_token_qr
 from apps.pedidos.models import Order, OrderItem
-from apps.tenants.models import LIMITES_POR_PLAN, Tenant
+from apps.tenants.models import Tenant
 
 PASSWORD = 'admin123'
 
@@ -110,61 +111,62 @@ QR_MARGEN_MIN = 80  # un pedido del personal ocupa la mesa hasta 75 min (y se co
 MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre',
          'octubre', 'noviembre', 'diciembre']
 
-# Cada local: nombre, ciudad, dirección, horario, días desde el alta del distribuidor hasta su apertura
-# y, si ya cerró, hace cuántos días. Si el distribuidor no está activo, todos sus locales cierran
+# Cada local: nombre, ciudad, dirección, horario, plan (apps/cafeterias/planes.py; sin indicarlo, Mensual),
+# días desde el alta del distribuidor hasta su apertura y, si ya cerró, hace cuántos días.
+# El distribuidor no tiene plan: lo paga cada local. Si el distribuidor no está activo, todos sus locales cierran
 # el día de la baja (o antes).
 TENANTS = [
     {
-        'name': 'Andes Coffee Group', 'city': 'Quito', 'plan': 'pro', 'status': 'active',
+        'name': 'Andes Coffee Group', 'city': 'Quito', 'status': 'active',
         'ruc': '1791234567001', 'business_name': 'Andes Coffee Group S.A.',
-        'email': 'contacto@andescoffee.ec', 'phone': '+593 2 245 1100', 'vence_en': 210,
+        'email': 'contacto@andescoffee.ec', 'phone': '+593 2 245 1100',
         'cafes': [
             dict(nombre='Café La Floresta', ciudad='Quito', direccion='Av. 12 de Octubre y Coruña',
-                 abre='07:00', cierra='21:00', alta=1, mesas=12, principal=True),
+                 abre='07:00', cierra='21:00', alta=1, mesas=12, principal=True, plan='pro'),
             dict(nombre='Café Cumbayá', ciudad='Quito', direccion='Av. Interoceánica km 12',
                  abre='07:30', cierra='21:00', alta=40, mesas=10,
                  # Ex camarero (cuenta desactivada hace 40 días) que pidió acceso a sus datos (LOPDP)
                  exequipo=[('camarero', 'Andrés', 'Yépez', 40)]),
             dict(nombre='Café Centro Histórico', ciudad='Quito', direccion='Calle García Moreno N4-52',
-                 abre='08:00', cierra='20:00', alta=75),
+                 abre='08:00', cierra='20:00', alta=75, plan='pro'),
             dict(nombre='Café Quicentro', ciudad='Quito',
                  direccion='C.C. Quicentro Shopping, Av. Naciones Unidas y Av. de los Shyris',
                  abre='08:00', cierra='21:00', alta=20, cerrada_hace=38),
         ],
     },
     {
-        'name': 'Café del Pacífico', 'city': 'Guayaquil', 'plan': 'basic', 'status': 'active',
+        'name': 'Café del Pacífico', 'city': 'Guayaquil', 'status': 'active',
         'ruc': '0992345678001', 'business_name': 'Pacífico Cafés Cía. Ltda.',
-        'email': 'hola@cafedelpacifico.ec', 'phone': '+593 4 260 3300', 'vence_en': 95,
+        'email': 'hola@cafedelpacifico.ec', 'phone': '+593 4 260 3300',
         'cafes': [
             dict(nombre='Pacífico Malecón', ciudad='Guayaquil', direccion='Malecón Simón Bolívar',
-                 abre='07:00', cierra='22:00', alta=2, mesas=11),
+                 abre='07:00', cierra='22:00', alta=2, mesas=11, plan='pro'),
             dict(nombre='Pacífico Samborondón', ciudad='Samborondón', direccion='Plaza Lagos, local 14',
                  abre='08:00', cierra='21:30', alta=45),
         ],
     },
     {
-        'name': 'Montaña Roast', 'city': 'Cuenca', 'plan': 'free', 'status': 'active',
+        'name': 'Montaña Roast', 'city': 'Cuenca', 'status': 'active',
         'ruc': '0103456789001', 'business_name': 'Montaña Roast',
-        'email': 'info@montanaroast.ec', 'phone': '+593 7 283 4400', 'vence_en': 12,
+        'email': 'info@montanaroast.ec', 'phone': '+593 7 283 4400',
         'cafes': [
             dict(nombre='Montaña Roast Calle Larga', ciudad='Cuenca', direccion='Calle Larga 7-45',
                  abre='07:30', cierra='20:00', alta=3),
         ],
     },
     {
-        'name': 'Galápagos Brew Co.', 'city': 'Puerto Ayora', 'plan': 'enterprise', 'status': 'suspended',
+        'name': 'Galápagos Brew Co.', 'city': 'Puerto Ayora', 'status': 'suspended',
         'ruc': '2004567890001', 'business_name': 'Galápagos Brew Company S.A.',
         'email': 'brew@galapagosbrew.ec', 'phone': '+593 5 252 5500', 'baja_hace': 14,
         'cafes': [
             dict(nombre='Brew Puerto Ayora', ciudad='Puerto Ayora', direccion='Av. Charles Darwin',
-                 abre='07:00', cierra='20:30', alta=2),
+                 abre='07:00', cierra='20:30', alta=2, plan='pro'),
             dict(nombre='Brew San Cristóbal', ciudad='Puerto Baquerizo', direccion='Malecón Charles Darwin',
                  abre='07:30', cierra='20:00', alta=12, cerrada_hace=26),
         ],
     },
     {
-        'name': 'Loja Tostadores', 'city': 'Loja', 'plan': 'basic', 'status': 'inactive',
+        'name': 'Loja Tostadores', 'city': 'Loja', 'status': 'inactive',
         'ruc': '1105678901001', 'business_name': 'Loja Tostadores Artesanales',
         'email': 'tostadores@loja.ec', 'phone': '+593 7 257 6600', 'baja_hace': 19,
         'cafes': [
@@ -439,7 +441,6 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ distribuidores y locales
 
     def _create_tenant(self, t_idx, data):
-        limites = LIMITES_POR_PLAN[data['plan']]
         activo = data['status'] == 'active'
         # Fechas de alta escalonadas para que el listado tenga historia
         alta = (self.now - timedelta(days=30 * (len(TENANTS) - t_idx) + 7)).replace(
@@ -449,11 +450,8 @@ class Command(BaseCommand):
         tenant = Tenant.objects.create(
             name=data['name'], slug=slugify(data['name']), email=data['email'], phone=data['phone'],
             city=data['city'], address=data['cafes'][0]['direccion'], ruc=data['ruc'],
-            business_name=data['business_name'], plan=data['plan'], status=data['status'],
-            is_active=activo, **limites,
+            business_name=data['business_name'], status=data['status'], is_active=activo,
             description=f"Distribuidor de cafeterías en {data['city']}.",
-            # Los no activos dejaron vencer la suscripción unos días antes de la baja
-            subscription_expires_at=self.now + timedelta(days=data['vence_en']) if activo else baja - timedelta(days=3),
         )
         self._fechar(Tenant, tenant.pk, alta, **({'updated_at': baja} if baja else {}))
 
@@ -480,7 +478,7 @@ class Command(BaseCommand):
                 address=info['direccion'], phone=self._celular(),
                 email=f"{slugify(info['nombre'])}@{tenant.slug}.ec",
                 open_time=_hora(info['abre']), close_time=_hora(info['cierra']),
-                is_active=cierre is None,
+                plan=info.get('plan', PLAN_POR_DEFECTO), is_active=cierre is None,
             )
             extra = {'updated_at': self._a_las(cierre, time(19, 0))} if cierre else {}
             self._fechar(Cafeteria, cafe.pk, alta_cafe, **extra)

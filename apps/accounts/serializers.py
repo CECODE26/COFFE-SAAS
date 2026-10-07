@@ -160,11 +160,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if cafeteria and cafeteria.tenant_id != getattr(tenant, 'id', None):
             raise serializers.ValidationError({'cafeteria': 'La cafetería no pertenece a este distribuidor.'})
 
-        if tenant and not tenant.can_create_user():
-            raise serializers.ValidationError(
-                {'non_field_errors': f'{tenant.name} alcanzó el límite de {tenant.max_users} usuarios de su plan.'}
-            )
-
         if nuevo:
             # Contacto de la empresa: si no se indica otro, el de su primera cuenta
             nuevo['email'] = nuevo.get('email') or attrs['email']
@@ -239,7 +234,7 @@ class DistribuidorRegistrationSerializer(serializers.Serializer):
     """
     Alta de un distribuidor junto con su administrador en una sola llamada (solo super admin).
     El distribuidor pasa por las mismas reglas que en la consola (TenantCreateSerializer):
-    plan de pago, RUC válido, nombre único y slug libre.
+    RUC válido, nombre único y slug libre. El distribuidor no tiene plan: el plan es de cada cafetería.
     """
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -249,7 +244,6 @@ class DistribuidorRegistrationSerializer(serializers.Serializer):
     distribuidor_name = serializers.CharField(max_length=255)
     ruc = serializers.CharField(max_length=20)
     business_name = serializers.CharField(max_length=255)
-    plan = serializers.CharField(required=False, default='basic')
 
     # First user (Admin)
     first_name = serializers.CharField(max_length=150)
@@ -274,7 +268,6 @@ class DistribuidorRegistrationSerializer(serializers.Serializer):
             'ruc': attrs['ruc'],
             'email': attrs['email'],
             'phone': attrs.get('phone', ''),
-            'plan': attrs['plan'],
         }, context=self.context)
         if not tenant_serializer.is_valid():
             errores = dict(tenant_serializer.errors)

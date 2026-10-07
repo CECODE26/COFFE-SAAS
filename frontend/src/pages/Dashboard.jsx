@@ -6,6 +6,7 @@ import { Layout, PageHeader, Loader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { money } from '../components/Stats';
+import { precioMensual } from '../lib/planes';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users, Receipt, Armchair, Gauge, ArrowUpRight } from 'lucide-react';
 import api from '../services/api';
@@ -27,12 +28,43 @@ const isToday = (iso) => {
 
 // Roles que ven varios locales a la vez
 const MULTI_LOCAL_ROLES = ['distribuidor_admin', 'super_admin'];
+// El admin y todo el personal del local ven su plan (solo lectura: lo cambian el super admin o el distribuidor)
+const VEN_PLAN = ['cafe_admin', 'gerente', 'camarero', 'cajero', 'cocinero'];
+
+// Plan del local, discreto: nombre, precio + IVA y, si es Pro, una píldora con la facturación SRI
+// (la píldora no lleva separador: si no cabe, baja sola a la línea siguiente)
+const PlanDelLocal = ({ plan }) => (
+  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-oro-200/80 bg-marfil px-3.5 py-1.5 text-xs text-verde-600 shadow-soft">
+    <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-oro-600">Plan</span>
+    <span className="font-serif text-sm italic font-medium text-verde-700">{plan.nombre}</span>
+    <span className="whitespace-nowrap">{precioMensual(plan.precio_mensual)}</span>
+    {plan.facturacion_sri && (
+      <span className="whitespace-nowrap rounded-full bg-oro-100 px-2 py-0.5 text-[10px] font-medium text-oro-700 ring-1 ring-oro-300/60">
+        Facturación SRI: próximamente
+      </span>
+    )}
+  </p>
+);
 
 export const Dashboard = () => {
   const { pedidos, fetchMesas, fetchPedidos } = useData();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [plan, setPlan] = useState(null);
+
+  const cafeteriaId = VEN_PLAN.includes(user?.role) ? user?.cafeteria : null;
+  useEffect(() => {
+    if (!cafeteriaId) return undefined;
+    let vigente = true;
+    api
+      .get(`/cafeterias/${cafeteriaId}/`)
+      .then(({ data }) => vigente && setPlan(data.plan_info || null))
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [cafeteriaId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -106,6 +138,7 @@ export const Dashboard = () => {
             eyebrow={today}
             title={`${greeting()}${user?.first_name ? `, ${user.first_name}` : ''}`}
             subtitle={multiLocal ? 'Así van tus locales hoy.' : 'Así va tu cafetería hoy.'}
+            actions={plan && <PlanDelLocal plan={plan} />}
           />
 
           {/* Métricas */}

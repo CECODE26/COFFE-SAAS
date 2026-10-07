@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import LIMITES_POR_PLAN, PLANES_DE_PAGO, Tenant
+from .models import Tenant
 
 
 class TenantListSerializer(serializers.ModelSerializer):
@@ -17,9 +17,9 @@ class TenantListSerializer(serializers.ModelSerializer):
         model = Tenant
         fields = [
             'id', 'name', 'slug', 'email', 'phone',
-            'business_name', 'plan', 'status',
+            'business_name', 'status',
             'active_cafes_count', 'active_users_count', 'admins_count',
-            'max_cafes', 'max_users', 'created_at'
+            'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -40,17 +40,14 @@ class TenantListSerializer(serializers.ModelSerializer):
 class TenantDetailSerializer(serializers.ModelSerializer):
     active_cafes_count = serializers.SerializerMethodField()
     active_users_count = serializers.SerializerMethodField()
-    can_create_cafe = serializers.SerializerMethodField()
-    can_create_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Tenant
         fields = [
             'id', 'name', 'slug', 'description', 'email', 'phone',
             'address', 'city', 'ruc', 'business_name', 'website',
-            'logo', 'plan', 'status', 'is_active', 'max_cafes',
-            'max_users', 'subscription_expires_at', 'active_cafes_count',
-            'active_users_count', 'can_create_cafe', 'can_create_user',
+            'logo', 'status', 'is_active',
+            'active_cafes_count', 'active_users_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -60,12 +57,6 @@ class TenantDetailSerializer(serializers.ModelSerializer):
 
     def get_active_users_count(self, obj):
         return obj.get_active_users_count()
-
-    def get_can_create_cafe(self, obj):
-        return obj.can_create_cafe()
-
-    def get_can_create_user(self, obj):
-        return obj.can_create_user()
 
 
 def _requerido(mensaje):
@@ -118,7 +109,7 @@ def slug_disponible(nombre):
 
 
 class TenantCreateSerializer(serializers.ModelSerializer):
-    """Alta de un distribuidor desde la consola del super admin"""
+    """Alta de un distribuidor desde la consola del super admin (sin plan: el plan es de cada cafetería)"""
 
     # Campos declarados a mano: validaciones y mensajes propios (sin los de unicidad del modelo)
     name = serializers.CharField(max_length=255, error_messages=_requerido('Escribe el nombre comercial.'))
@@ -127,13 +118,12 @@ class TenantCreateSerializer(serializers.ModelSerializer):
         **_requerido('Escribe el email de contacto.'), 'invalid': 'Escribe un email válido.',
     })
     ruc = serializers.CharField(max_length=20, error_messages=_requerido('Escribe el RUC.'))
-    plan = serializers.CharField(required=False, default='basic')
 
     class Meta:
         model = Tenant
         fields = [
             'name', 'description', 'email', 'phone',
-            'address', 'city', 'ruc', 'business_name', 'website', 'logo', 'plan'
+            'address', 'city', 'ruc', 'business_name', 'website', 'logo'
         ]
 
     def validate_name(self, value):
@@ -148,15 +138,7 @@ class TenantCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Este RUC ya está registrado.")
         return value
 
-    def validate_plan(self, value):
-        if value == 'free':
-            raise serializers.ValidationError("No hay plan gratis: elige Básico, Pro o Empresa.")
-        if value not in PLANES_DE_PAGO:
-            raise serializers.ValidationError("Plan inválido: elige Básico, Pro o Empresa.")
-        return value
-
     def create(self, validated_data):
-        validated_data.update(LIMITES_POR_PLAN[validated_data['plan']])
         # Dos altas simultáneas pueden pasar las validaciones y chocar en la base (unique de
         # slug, nombre o RUC): el slug se recalcula y reintenta; lo demás se responde como 400.
         for _ in range(3):
@@ -172,7 +154,7 @@ class TenantCreateSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError("No se pudo crear el distribuidor. Inténtalo de nuevo.")
 
     def to_representation(self, instance):
-        # La respuesta trae la ficha completa (id, plan, límites, estado…) para pintarla sin recargar
+        # La respuesta trae la ficha completa (id, estado, cafeterías…) para pintarla sin recargar
         return TenantDetailSerializer(instance, context=self.context).data
 
 
@@ -181,30 +163,26 @@ class NuevoDistribuidorSerializer(TenantCreateSerializer):
     Empresa que se crea junto con su primera cuenta Distribuidor desde Nuevo usuario
     (campo nuevo_distribuidor de UserCreateSerializer). Mismas reglas que la consola: nombre y RUC
     únicos, RUC válido y slug libre. Email y teléfono de contacto son opcionales (quien lo usa pone
-    los de la cuenta) y el plan no se elige: queda el del modelo.
+    los de la cuenta).
     """
     email = serializers.EmailField(required=False, allow_blank=True, error_messages={
         'invalid': 'Escribe un email válido.',
     })
-    plan = serializers.HiddenField(default=Tenant._meta.get_field('plan').get_default())
 
     class Meta(TenantCreateSerializer.Meta):
-        fields = ['name', 'business_name', 'ruc', 'email', 'phone', 'plan']
+        fields = ['name', 'business_name', 'ruc', 'email', 'phone']
 
 
 class TenantUpdateSerializer(serializers.ModelSerializer):
-    """
-    Edición de la ficha. El plan (y sus límites) solo cambia con la acción upgrade_plan,
-    para que plan, max_cafes y max_users no se desincronicen.
-    """
+    """Edición de la ficha (solo super admin). El RUC no se cambia."""
     class Meta:
         model = Tenant
         fields = [
             'name', 'description', 'email', 'phone',
             'address', 'city', 'ruc', 'business_name', 'website', 'logo',
-            'status', 'is_active', 'plan', 'max_cafes', 'max_users'
+            'status', 'is_active'
         ]
-        read_only_fields = ['ruc', 'plan', 'max_cafes', 'max_users']
+        read_only_fields = ['ruc']
 
     def validate_name(self, value):
         return validar_nombre_distribuidor(value, excluir=self.instance)
@@ -227,7 +205,3 @@ class TenantStatsSerializer(serializers.Serializer):
     active_cafes = serializers.IntegerField()
     total_users = serializers.IntegerField()
     active_users = serializers.IntegerField()
-    plan = serializers.CharField()
-    subscription_expires_at = serializers.DateTimeField()
-    can_create_cafe = serializers.BooleanField()
-    can_create_user = serializers.BooleanField()

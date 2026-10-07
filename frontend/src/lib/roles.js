@@ -13,35 +13,7 @@ export const ROLE_LABELS = {
   usuario: 'Usuario',
 };
 
-export const PLAN_LABELS = {
-  free: 'Gratis',
-  basic: 'Básico',
-  pro: 'Pro',
-  enterprise: 'Empresa',
-};
-
-// Espejo de LIMITES_POR_PLAN (apps/tenants/models.py). 999 o más se muestra como ilimitado.
-export const PLAN_LIMITS = {
-  free: { cafes: 1, users: 10 },
-  basic: { cafes: 5, users: 50 },
-  pro: { cafes: 20, users: 500 },
-  enterprise: { cafes: 999, users: 9999 },
-};
-
-// Planes que se venden (no hay plan gratis; 'free' queda solo por cuentas antiguas)
-export const PLANES_DE_PAGO = ['basic', 'pro', 'enterprise'];
-
-// 999 o más se lee como ilimitado (igual que UsageBar en la tabla de Plataforma)
-export const isUnlimited = (n) => n >= 999;
-
-// Límites de un plan en una línea, corta para caber en la tarjeta del plan:
-// "5 cafeterías · 50 usuarios" o "Ilimitado" (la misma palabra que la tabla de Plataforma)
-export const limitsText = (cafes, users) => {
-  if (isUnlimited(cafes) && isUnlimited(users)) return 'Ilimitado';
-  const c = isUnlimited(cafes) ? 'cafeterías ilimitadas' : `${cafes} ${cafes === 1 ? 'cafetería' : 'cafeterías'}`;
-  const u = isUnlimited(users) ? 'usuarios ilimitados' : `${users} ${users === 1 ? 'usuario' : 'usuarios'}`;
-  return `${c} · ${u}`;
-};
+// El plan es de cada cafetería (lib/planes.js); el distribuidor no tiene plan ni límites.
 
 const OPERACION = [
   { path: '/dashboard', label: 'Resumen', icon: LayoutGrid },

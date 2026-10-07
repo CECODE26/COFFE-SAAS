@@ -1,4 +1,4 @@
-"""Alta de distribuidores desde la consola: plan y límites, validaciones (RUC, nombre, email), slug y permisos"""
+"""Alta de distribuidores desde la consola: sin plan ni límites, validaciones (RUC, nombre, email), slug y permisos"""
 import itertools
 from unittest import mock
 
@@ -7,7 +7,7 @@ from rest_framework.test import APIClient, APITestCase
 
 from apps.accounts.models import User
 from apps.cafeterias.models import Cafeteria
-from apps.tenants.models import LIMITES_POR_PLAN, Tenant
+from apps.tenants.models import Tenant
 from apps.tenants.serializers import TenantCreateSerializer, slug_disponible
 
 API_TENANTS = '/api/v1/tenants/'
@@ -27,7 +27,7 @@ class CrearDistribuidorTests(APITestCase):
         )
         self.existente = Tenant.objects.create(
             name='Andes Coffee Group', slug='andes-coffee-group', email='andes@prueba.ec',
-            ruc='1790012345001', business_name='Andes Coffee Group S.A.', plan='pro', max_cafes=20, max_users=500,
+            ruc='1790012345001', business_name='Andes Coffee Group S.A.',
         )
 
     def como(self, usuario):
@@ -48,55 +48,36 @@ class CrearDistribuidorTests(APITestCase):
     def crear(self, usuario=None, **extra):
         return self.como(usuario or self.super_admin).post(API_TENANTS, self.datos(**extra), format='json')
 
-    # ----------------------------------------------------------------- creación y plan
+    # ----------------------------------------------------------------- creación (sin plan)
 
-    def test_crea_con_plan_basico_por_defecto(self):
+    def test_crea_sin_plan_ni_limites(self):
         r = self.crear(name='Cafés del Austro')
         self.assertEqual(r.status_code, 201, r.content)
-        for campo in ['id', 'name', 'plan', 'max_cafes', 'max_users', 'status']:
+        for campo in ['id', 'name', 'status', 'active_cafes_count', 'active_users_count']:
             self.assertIn(campo, r.data)
-        self.assertEqual(r.data['plan'], 'basic')
-        self.assertEqual((r.data['max_cafes'], r.data['max_users']), (5, 50))
+        # El plan es de cada cafetería: el distribuidor no lo tiene, ni topes de locales o usuarios
+        for campo in ['plan', 'max_cafes', 'max_users', 'can_create_cafe', 'can_create_user']:
+            self.assertNotIn(campo, r.data)
         self.assertEqual(r.data['status'], 'active')
 
         tenant = Tenant.objects.get(pk=r.data['id'])
         self.assertEqual(str(tenant.pk), str(r.data['id']))
         self.assertEqual(tenant.slug, 'cafes-del-austro')
-        self.assertEqual((tenant.plan, tenant.max_cafes, tenant.max_users), ('basic', 5, 50))
         self.assertTrue(tenant.is_active)
         self.assertEqual(tenant.city, 'Cuenca')
 
-    def test_crea_con_plan_pro_y_sus_limites(self):
-        r = self.crear(plan='pro')
-        self.assertEqual(r.status_code, 201, r.content)
-        tenant = Tenant.objects.get(pk=r.data['id'])
-        self.assertEqual((tenant.plan, tenant.max_cafes, tenant.max_users), ('pro', 20, 500))
-
-    def test_crea_con_plan_empresa(self):
-        r = self.crear(plan='enterprise')
-        self.assertEqual(r.status_code, 201, r.content)
-        self.assertEqual((r.data['max_cafes'], r.data['max_users']), (999, 9999))
-
-    def test_mismos_limites_que_el_cambio_de_plan(self):
-        tenant = Tenant.objects.get(pk=self.crear(plan='basic').data['id'])
-        for plan in ['pro', 'enterprise', 'basic']:
-            limites = LIMITES_POR_PLAN[plan]
+    def test_plan_enviado_se_ignora(self):
+        # Un cliente antiguo que todavía manda el plan (incluso uno que ya no existe) no rompe el alta
+        for plan in ['pro', 'free', 'platino']:
             with self.subTest(plan=plan):
-                r = self.como(self.super_admin).post(f'{API_TENANTS}{tenant.pk}/upgrade_plan/', {'plan': plan}, format='json')
-                self.assertEqual(r.status_code, 200, r.content)
-                tenant.refresh_from_db()
-                self.assertEqual((tenant.max_cafes, tenant.max_users), (limites['max_cafes'], limites['max_users']))
+                r = self.crear(plan=plan)
+                self.assertEqual(r.status_code, 201, r.content)
+                self.assertNotIn('plan', r.data)
 
-    def test_plan_gratis_rechazado(self):
-        r = self.crear(plan='free')
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('gratis', str(r.data['plan']))
-        self.assertEqual(Tenant.objects.count(), 1)
-
-    def test_plan_inexistente_rechazado(self):
-        r = self.crear(plan='platino')
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('plan', r.data)
+    def test_ya_no_existe_el_cambio_de_plan(self):
+        tenant = Tenant.objects.get(pk=self.crear().data['id'])
+        r = self.como(self.super_admin).post(f'{API_TENANTS}{tenant.pk}/upgrade_plan/', {'plan': 'pro'}, format='json')
+        self.assertEqual(r.status_code, 404, r.content)
 
     def test_email_se_guarda_en_minusculas(self):
         r = self.crear(email='Ventas@CafesDelAustro.EC')

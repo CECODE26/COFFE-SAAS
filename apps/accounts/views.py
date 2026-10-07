@@ -68,7 +68,6 @@ class DistribuidorRegistrationView(views.APIView):
                     'id': str(tenant.id),
                     'name': tenant.name,
                     'slug': tenant.slug,
-                    'plan': tenant.plan,
                 }
             }
         }, status=status.HTTP_201_CREATED)

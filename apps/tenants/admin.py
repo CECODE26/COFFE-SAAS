@@ -4,8 +4,8 @@ from .models import Tenant
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ['name', 'ruc', 'plan', 'status', 'get_active_cafes_count', 'get_active_users_count', 'is_active', 'created_at']
-    list_filter = ['plan', 'status', 'is_active', 'created_at']
+    list_display = ['name', 'ruc', 'status', 'get_active_cafes_count', 'get_active_users_count', 'is_active', 'created_at']
+    list_filter = ['status', 'is_active', 'created_at']
     search_fields = ['name', 'email', 'ruc', 'business_name']
     ordering = ['-created_at']
     readonly_fields = ['id', 'created_at', 'updated_at']
@@ -19,9 +19,6 @@ class TenantAdmin(admin.ModelAdmin):
         }),
         ('Datos Comerciales', {
             'fields': ('ruc', 'business_name', 'website', 'logo')
-        }),
-        ('Plan y Límites', {
-            'fields': ('plan', 'max_cafes', 'max_users', 'subscription_expires_at')
         }),
         ('Estado', {
             'fields': ('status', 'is_active')

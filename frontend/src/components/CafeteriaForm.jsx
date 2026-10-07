@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Modal, Field, FormAlert, parseApiErrors } from './Form';
 import { Button } from './Button';
-import { PLAN_LABELS, isUnlimited } from '../lib/roles';
+import { PLANES, PLAN_POR_DEFECTO, NOTA_IVA, precioMensual } from '../lib/planes';
 import toast from 'react-hot-toast';
 import api, { fetchAll } from '../services/api';
 
@@ -18,39 +18,158 @@ const EMPTY = {
   open_time: '07:00',
   close_time: '21:00',
   description: '',
+  plan: PLAN_POR_DEFECTO,
 };
 
-export const CafeteriaForm = ({ open, onClose, onCreated }) => {
+// Lo que se puede cambiar de una cafetería existente (CafeteriaUpdateSerializer): el distribuidor y el RUC no
+const EDITABLES = ['name', 'city', 'address', 'phone', 'email', 'capacity', 'open_time', 'close_time', 'description', 'plan'];
+
+// Ficha de la API -> formulario (las horas llegan como "07:00:00")
+const fromCafe = (c) => ({
+  ...EMPTY,
+  ...Object.fromEntries(EDITABLES.filter((k) => c[k] !== undefined && c[k] !== null).map((k) => [k, c[k]])),
+  open_time: (c.open_time || EMPTY.open_time).slice(0, 5),
+  close_time: (c.close_time || EMPTY.close_time).slice(0, 5),
+});
+
+const planName = (id) => PLANES.find((p) => p.id === id)?.name || id;
+
+// Selector de plan: grupo de radios con una sola parada de Tab; flechas, Inicio y Fin cambian de plan
+const PlanPicker = ({ value, onChange, error }) => {
+  const refs = useRef({});
+  const onKey = (e) => {
+    const i = PLANES.findIndex((p) => p.id === value);
+    const last = PLANES.length - 1;
+    const next = {
+      ArrowRight: i < last ? i + 1 : 0,
+      ArrowDown: i < last ? i + 1 : 0,
+      ArrowLeft: i > 0 ? i - 1 : last,
+      ArrowUp: i > 0 ? i - 1 : last,
+      Home: 0,
+      End: last,
+    }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const id = PLANES[next].id;
+    onChange(id);
+    refs.current[id]?.focus();
+  };
+
+  return (
+    <>
+      <div
+        className="grid gap-2 sm:grid-cols-2"
+        role="radiogroup"
+        aria-label="Plan"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? 'cafe-plan-error' : 'cafe-plan-nota'}
+        onKeyDown={onKey}
+      >
+        {PLANES.map((p) => {
+          const on = value === p.id;
+          return (
+            <button
+              key={p.id}
+              ref={(el) => {
+                refs.current[p.id] = el;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => onChange(p.id)}
+              className={`flex flex-col items-start rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
+                on
+                  ? 'border-cobalto-500 bg-cobalto-50 ring-4 ring-cobalto-100'
+                  : 'border-oro-200 bg-marfil hover:border-oro-400 hover:bg-pistacho-50'
+              }`}
+            >
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className={`font-serif text-[15px] italic font-medium leading-tight ${on ? 'text-cobalto-600' : 'text-verde-700'}`}>
+                  {p.name}
+                </span>
+                {on && <span className="h-1.5 w-1.5 shrink-0 rotate-45 bg-oro-400" aria-hidden="true" />}
+              </span>
+              <span className="mt-0.5 text-sm font-medium text-verde-800">{precioMensual(p.price)}</span>
+              <span className="mt-0.5 text-xs leading-snug text-verde-600">{p.incluye}</span>
+            </button>
+          );
+        })}
+      </div>
+      {error ? (
+        <p id="cafe-plan-error" role="alert" className="field-error mt-1.5 text-xs text-terracotta-700">{error}</p>
+      ) : (
+        <p id="cafe-plan-nota" className="field-hint mt-1.5 text-xs text-verde-600">Precio por local. {NOTA_IVA}</p>
+      )}
+    </>
+  );
+};
+
+// Alta (sin `cafe`) o edición (con `cafe`, una fila de la lista) de una cafetería.
+// Solo lo usan super admin y distribuidor: los dos eligen y cambian el plan. onSaved(ficha, { created }).
+export const CafeteriaForm = ({ open, onClose, onSaved, cafe = null }) => {
   const { user } = useAuth();
   const isSuper = user?.role === 'super_admin';
+  const editing = !!cafe;
   const [form, setForm] = useState(EMPTY);
+  const [initialPlan, setInitialPlan] = useState(null);
   const [tenants, setTenants] = useState([]);
   const [errors, setErrors] = useState({ fields: {}, general: null });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
-    setForm(EMPTY);
+    if (!open) return undefined;
+    let vigente = true;
     setErrors({ fields: {}, general: null });
-    if (isSuper) fetchAll('/tenants/').then(setTenants).catch(() => {});
-  }, [open, isSuper]);
+    if (cafe) {
+      // Se pinta con la fila de la lista; la descripción (que la lista no trae) llega con la ficha
+      // y solo se pone si nadie la escribió mientras tanto
+      setForm(fromCafe(cafe));
+      setInitialPlan(cafe.plan);
+      api
+        .get(`/cafeterias/${cafe.id}/`)
+        .then(({ data }) => {
+          if (vigente) setForm((f) => (f.description ? f : { ...f, description: data.description || '' }));
+        })
+        .catch(() => {});
+    } else {
+      setForm(EMPTY);
+      setInitialPlan(null);
+      if (isSuper) fetchAll('/tenants/').then((t) => vigente && setTenants(t)).catch(() => {});
+    }
+    return () => {
+      vigente = false;
+    };
+  }, [open, isSuper, cafe]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const err = (key) => errors.fields[key];
 
-  const selectedTenant = tenants.find((t) => t.id === form.tenant);
-  const tenantFull = selectedTenant && selectedTenant.active_cafes_count >= selectedTenant.max_cafes;
+  const setPlan = (plan) => {
+    setForm((f) => ({ ...f, plan }));
+    if (errors.fields.plan) setErrors((x) => ({ ...x, fields: { ...x.fields, plan: undefined } }));
+  };
+
+  const planChanged = editing && initialPlan && form.plan !== initialPlan;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setErrors({ fields: {}, general: null });
-    const payload = { ...form, capacity: Number(form.capacity) };
-    if (!isSuper) delete payload.tenant;
     try {
-      const { data } = await api.post('/cafeterias/', payload);
-      toast.success(`${data.name} creada`);
-      onCreated?.(data);
+      if (editing) {
+        const payload = Object.fromEntries(EDITABLES.map((k) => [k, form[k]]));
+        payload.capacity = Number(form.capacity);
+        const { data } = await api.patch(`/cafeterias/${cafe.id}/`, payload);
+        toast.success(planChanged ? `${data.name}: plan ${data.plan_info?.nombre}` : `${data.name} actualizada`);
+        onSaved?.(data, { created: false });
+      } else {
+        const payload = { ...form, capacity: Number(form.capacity) };
+        if (!isSuper) delete payload.tenant;
+        const { data } = await api.post('/cafeterias/', payload);
+        toast.success(`${data.name} creada`);
+        onSaved?.(data, { created: true });
+      }
       onClose();
     } catch (error) {
       setErrors(parseApiErrors(error));
@@ -64,14 +183,14 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
       open={open}
       onClose={onClose}
       size="lg"
-      eyebrow={isSuper ? 'Plataforma' : user?.tenant_name}
-      title="Nueva cafetería"
-      subtitle="Abre un nuevo local en la red."
+      eyebrow={isSuper ? (editing ? cafe.tenant_name : 'Plataforma') : user?.tenant_name}
+      title={editing ? 'Editar cafetería' : 'Nueva cafetería'}
+      subtitle={editing ? 'Datos del local y su plan.' : 'Abre un nuevo local en la red.'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" form="cafeteria-form" disabled={saving || tenantFull}>
-            {saving ? 'Guardando…' : 'Crear cafetería'}
+          <Button type="submit" form="cafeteria-form" disabled={saving}>
+            {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear cafetería'}
           </Button>
         </>
       }
@@ -79,21 +198,8 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
       <form id="cafeteria-form" onSubmit={handleSubmit} className="space-y-5">
         <FormAlert>{errors.general}</FormAlert>
 
-        {isSuper && (
-          <Field
-            label="Distribuidor"
-            required
-            error={
-              err('tenant') ||
-              (tenantFull && `Sin cupo: el plan ${PLAN_LABELS[selectedTenant.plan]} permite ${selectedTenant.max_cafes}. Sube su plan desde la consola.`)
-            }
-            hint={
-              selectedTenant &&
-              `Plan ${PLAN_LABELS[selectedTenant.plan]} · ${selectedTenant.active_cafes_count} ${
-                isUnlimited(selectedTenant.max_cafes) ? 'cafeterías · ilimitado' : `de ${selectedTenant.max_cafes} cafeterías`
-              }`
-            }
-          >
+        {isSuper && !editing && (
+          <Field label="Distribuidor" required error={err('tenant')}>
             <select className="input" value={form.tenant} onChange={set('tenant')} required>
               <option value="">Selecciona un distribuidor…</option>
               {tenants.map((t) => (
@@ -116,16 +222,31 @@ export const CafeteriaForm = ({ open, onClose, onCreated }) => {
           </Field>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className={`grid gap-5 ${editing ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
           <Field label="Teléfono" error={err('phone')}>
             <input className="input" value={form.phone} onChange={set('phone')} placeholder="+593 9…" />
           </Field>
           <Field label="Email" error={err('email')}>
             <input className="input" type="email" value={form.email} onChange={set('email')} placeholder="local@cafe.ec" />
           </Field>
-          <Field label="RUC sucursal" error={err('ruc')}>
-            <input className="input" value={form.ruc} onChange={set('ruc')} placeholder="1791234567001" />
-          </Field>
+          {!editing && (
+            <Field label="RUC sucursal" error={err('ruc')}>
+              <input className="input" value={form.ruc} onChange={set('ruc')} placeholder="1791234567001" />
+            </Field>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 sm:p-5">
+          <p className="mb-3 flex items-center gap-2.5 font-serif text-lg italic font-medium text-verde-700">
+            <span className="rombo" aria-hidden="true" />
+            Plan
+          </p>
+          <PlanPicker value={form.plan} onChange={setPlan} error={err('plan')} />
+          {planChanged && (
+            <p className="mt-2 text-xs text-cobalto-600" role="status">
+              Pasa de {planName(initialPlan)} a {planName(form.plan)} al guardar. El cambio queda registrado.
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-oro-200/80 bg-pistacho-50 p-4 sm:p-5">

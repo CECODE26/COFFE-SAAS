@@ -26,7 +26,7 @@ def crear_tenant(**extra):
     n = next(_secuencia)
     datos = dict(
         name=f'Cadena {n}', slug=f'cadena-{n}', email=f'cadena{n}@prueba.ec',
-        ruc=f'170{n:07d}001', business_name=f'Cadena {n} S.A.', plan='basic', max_cafes=5, max_users=50,
+        ruc=f'170{n:07d}001', business_name=f'Cadena {n} S.A.',
     )
     datos.update(extra)
     return Tenant.objects.create(**datos)

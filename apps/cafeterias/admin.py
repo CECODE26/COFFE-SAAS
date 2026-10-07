@@ -4,8 +4,8 @@ from .models import Cafeteria
 
 @admin.register(Cafeteria)
 class CafeteriaAdmin(admin.ModelAdmin):
-    list_display = ['name', 'tenant', 'city', 'capacity', 'get_active_users_count', 'is_active', 'created_at']
-    list_filter = ['tenant', 'city', 'is_active', 'created_at']
+    list_display = ['name', 'tenant', 'city', 'plan', 'capacity', 'get_active_users_count', 'is_active', 'created_at']
+    list_filter = ['plan', 'tenant', 'city', 'is_active', 'created_at']
     search_fields = ['name', 'city', 'email', 'phone', 'address']
     ordering = ['-created_at']
     readonly_fields = ['id', 'created_at', 'updated_at']
@@ -22,6 +22,10 @@ class CafeteriaAdmin(admin.ModelAdmin):
         }),
         ('Datos Comerciales', {
             'fields': ('ruc', 'registration_number')
+        }),
+        # Los cambios de plan hechos aquí no quedan en la auditoría: mejor desde el panel (Cafeterías > Editar)
+        ('Plan', {
+            'fields': ('plan',)
         }),
         ('Capacidad', {
             'fields': ('capacity', 'open_time', 'close_time')
